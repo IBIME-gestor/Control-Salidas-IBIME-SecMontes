@@ -1,0 +1,142 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    // El perfil se busca por correo (no por uid): con login de Google, una
+    // Cloud Function (ver functions/index.js) crea automáticamente el
+    // perfil de cada persona la primera vez que entra, con rol
+    // "colaborador" salvo que sea uno de los administradores iniciales.
+    function perfil() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.token.email)).data;
+    }
+
+    // Un usuario puede tener uno o varios roles a la vez (perfil.roles).
+    function tieneRol(r) {
+      return estaAutenticado() && ('roles' in perfil()) && (r in perfil().roles);
+    }
+
+    function esAdmin() {
+      return tieneRol('administrador');
+    }
+
+    // Único punto de verdad de privilegios: perfil.permisos siempre se
+    // guarda ya "expandido" (todas las llaves, en true/false) desde
+    // ManageUsers.jsx, así que aquí solo se lee el valor puntual. El
+    // administrador siempre tiene acceso total, tenga o no la llave.
+    function tienePermiso(permiso) {
+      return estaAutenticado() &&
+        (esAdmin() || (('permisos' in perfil()) && (permiso in perfil().permisos) && perfil().permisos[permiso] == true));
+    }
+
+    // Modelo: cada privilegio se prende/apaga por persona desde el panel
+    // de Usuarios (con un paquete por defecto según su rol), sin quedar
+    // atado de forma rígida a un solo rol fijo.
+    function puedeEditarAlumnos() {
+      return tienePermiso('editarAlumnos');
+    }
+
+    function puedeGestionarTiposSalida() {
+      return tienePermiso('gestionarTiposSalida');
+    }
+
+    function puedeTomarAsistencia() {
+      return tienePermiso('tomarAsistencia');
+    }
+
+    function puedeCapturarRetardos() {
+      return tienePermiso('capturarRetardos');
+    }
+
+    function puedeOtorgarSalidaAnticipada() {
+      return tienePermiso('salidaAnticipada');
+    }
+
+    // Permite que tutoría/recepción/supervisión sumen a los contadores de
+    // retardos/faltas del alumno (para alertas y el futuro correo al
+    // padre) SIN poder tocar ningún otro campo de su ficha — solo el
+    // administrador puede editar tipoSalidaId, diasSalida, etc.
+    function soloActualizaContadores() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['contadorRetardos', 'contadorFaltas']);
+    }
+
+    // --- usuarios (documento por correo, no por uid) ---
+    match /usuarios/{correo} {
+      allow read: if estaAutenticado() && (request.auth.token.email == correo || esAdmin());
+      allow write: if esAdmin();
+    }
+
+    // --- alumnos ---
+    match /alumnos/{alumnoId} {
+      allow read: if estaAutenticado();
+      allow create: if puedeEditarAlumnos();
+      allow update: if puedeEditarAlumnos() ||
+        ((puedeTomarAsistencia() || puedeCapturarRetardos()) && soloActualizaContadores());
+      allow delete: if esAdmin();
+
+      // Comentarios/observaciones: cualquier autenticado puede dejarlos
+      // (principalmente docentes); nadie los edita ni borra una vez
+      // creados, para mantener el historial auditable.
+      match /comentarios/{comentarioId} {
+        allow read: if estaAutenticado();
+        allow create: if estaAutenticado();
+        allow update, delete: if esAdmin();
+      }
+    }
+
+    // --- tiposSalida ---
+    match /tiposSalida/{tipoId} {
+      allow read: if estaAutenticado();
+      allow write: if puedeGestionarTiposSalida();
+    }
+
+    // --- eventos: bitácora operativa diaria ---
+    // Es un registro inmutable: se crea, no se edita ni se borra (salvo el
+    // administrador). Cualquier autenticado puede crear eventos normales
+    // (salida/traslado/entrega desde el docente, falta/retardo desde
+    // asistencia), pero SALIDA_ANTICIPADA solo la crean recepción,
+    // supervisión o admin.
+    match /eventos/{eventoId} {
+      allow read: if estaAutenticado();
+      allow create: if estaAutenticado() &&
+        (request.resource.data.accion != 'SALIDA_ANTICIPADA' || puedeOtorgarSalidaAnticipada());
+      allow update, delete: if esAdmin();
+    }
+
+    // --- supervisores: catálogo de guardias por día ---
+    match /supervisores/{supervisorId} {
+      allow read: if estaAutenticado();
+      allow write: if puedeGestionarTiposSalida();
+    }
+
+    // --- asistencia: pase de lista diario ---
+    // Solo tutoría (y admin) toman/corrigen lista; recepción/supervisión
+    // también pueden escribir aquí porque su captura de "retardo" en la
+    // entrada también se guarda en esta misma colección.
+    match /asistencia/{asistenciaId} {
+      allow read: if estaAutenticado();
+      allow create, update: if puedeTomarAsistencia() || puedeCapturarRetardos();
+      allow delete: if esAdmin();
+    }
+
+    // --- meta: documento único con listas de tutores/grupos ---
+    match /meta/{metaId} {
+      allow read: if estaAutenticado();
+      allow write: if esAdmin();
+    }
+
+    // --- horarios: una fila = una clase (día, hora, grupo, materia,
+    // docente, salón). Cambia poco (una vez por semestre); solo el
+    // administrador lo carga/edita, todos lo pueden consultar (para el
+    // módulo de disponibilidad).
+    match /horarios/{horarioId} {
+      allow read: if estaAutenticado();
+      allow write: if esAdmin();
+    }
+  }
+}
