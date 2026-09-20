@@ -16,7 +16,7 @@ const db = getFirestore()
 // administrador puede promover a alguien más desde el panel de Usuarios
 // sin tocar código.
 const CORREOS_ADMIN_INICIALES = [
-  // 'director@ibime.edu.mx',
+  // 'josue.jain@ibime.edu.mx',
 ]
 
 const DOMINIO_PERMITIDO = 'ibime.edu.mx'
