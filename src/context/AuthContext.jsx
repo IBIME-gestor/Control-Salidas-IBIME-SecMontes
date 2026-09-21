@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth'
-import { doc, onSnapshot } from 'firebase/firestore'
-import { auth, db, DOMINIO_PERMITIDO } from '../firebase.js'
+import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { auth, db, DOMINIO_PERMITIDO, CORREOS_ADMIN_INICIALES } from '../firebase.js'
+import { ROLES, permisosPorDefecto } from '../utils/roles.js'
 
 const AuthContext = createContext(null)
 
@@ -12,13 +13,14 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError] = useState('')
 
   useEffect(() => {
-    // Se escucha el perfil en vivo (onSnapshot) y no con una sola lectura,
-    // porque al iniciar sesión por primera vez el documento en /usuarios
-    // todavía no existe: lo crea automáticamente una Cloud Function
-    // (ver functions/index.js) uno o dos segundos después del alta de la
-    // cuenta en Firebase Auth. Con onSnapshot, en cuanto ese documento
-    // aparece (o cambia el rol/permisos más adelante), la app se actualiza
-    // sola sin que la persona tenga que recargar ni volver a entrar.
+    // Se escucha el perfil en vivo (onSnapshot) porque, si es la primera
+    // vez que esta persona entra, el documento en /usuarios todavía no
+    // existe: lo crea el propio navegador aquí abajo (autoaprovisionar),
+    // sin Cloud Functions ni plan Blaze — con las reglas de Firestore
+    // (firestore.rules) validando que solo pueda crear SU PROPIO
+    // documento y solo con rol "colaborador" (o "administrador" si su
+    // correo está en CORREOS_ADMIN_INICIALES), nunca con otro rol o con
+    // privilegios de más.
     let unsubPerfil = null
 
     const unsubAuth = onAuthStateChanged(auth, (u) => {
@@ -44,11 +46,40 @@ export function AuthProvider({ children }) {
       if (u) {
         const correoId = u.email.toLowerCase()
         const ref = doc(db, 'usuarios', correoId)
+        let intentoDeAlta = false
+
         unsubPerfil = onSnapshot(
           ref,
-          (snap) => {
-            setPerfil(snap.exists() ? { id: snap.id, ...snap.data() } : null)
-            setCargando(false)
+          async (snap) => {
+            if (snap.exists()) {
+              setPerfil({ id: snap.id, ...snap.data() })
+              setCargando(false)
+              return
+            }
+
+            // No existe todavía: se autoaprovisiona una sola vez. Si el
+            // create falla (por ejemplo, sin conexión), no se reintenta en
+            // bucle; el listener seguirá esperando a que exista.
+            if (intentoDeAlta) return
+            intentoDeAlta = true
+            const esAdminInicial = CORREOS_ADMIN_INICIALES.map((c) => c.toLowerCase()).includes(correoId)
+            const rolesIniciales = esAdminInicial ? [ROLES.ADMIN] : [ROLES.COLABORADOR]
+            try {
+              await setDoc(ref, {
+                nombre: u.displayName || correoId,
+                correo: correoId,
+                roles: rolesIniciales,
+                permisos: permisosPorDefecto(rolesIniciales),
+                grupoAsignado: '',
+                tipoGrupoAsignado: '',
+                tutorAsignado: ''
+              })
+              // onSnapshot se vuelve a disparar solo con el documento nuevo.
+            } catch (e) {
+              console.error('No se pudo autoaprovisionar el perfil:', e)
+              setPerfil(null)
+              setCargando(false)
+            }
           },
           (e) => {
             console.error('No se pudo cargar el perfil del usuario:', e)
