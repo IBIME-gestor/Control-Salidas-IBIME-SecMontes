@@ -13,13 +13,26 @@ service cloud.firestore {
     // src/context/AuthContext.jsx y src/components/ManageUsers.jsx): sin
     // esto, a alguien cuyo token traiga el correo con mayúsculas Firestore
     // le negaría el acceso a su propio documento.
+    function rutaPerfil() {
+      return /databases/$(database)/documents/usuarios/$(request.auth.token.email.lower());
+    }
+
+    // IMPORTANTE: get(...).data truena (error, no simplemente "vacío") si
+    // el documento no existe todavía — por ejemplo, la primerísima vez que
+    // alguien entra, antes de que su perfil se cree. Por eso SIEMPRE se
+    // revisa primero con exists(): el operador ?: es perezoso (no evalúa
+    // get() si exists() ya dio false), así que perfil() nunca truena.
+    function perfilExiste() {
+      return estaAutenticado() && exists(rutaPerfil());
+    }
+
     function perfil() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.token.email.lower())).data;
+      return perfilExiste() ? get(rutaPerfil()).data : {};
     }
 
     // Un usuario puede tener uno o varios roles a la vez (perfil.roles).
     function tieneRol(r) {
-      return estaAutenticado() && ('roles' in perfil()) && (r in perfil().roles);
+      return perfilExiste() && ('roles' in perfil()) && (r in perfil().roles);
     }
 
     function esAdmin() {
