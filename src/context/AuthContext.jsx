@@ -86,15 +86,25 @@ export function AuthProvider({ children }) {
 
             const rolesFinales = esAdminInicial ? [ROLES.ADMIN] : [ROLES.COLABORADOR]
             try {
-              await setDoc(ref, {
-                nombre: datosActuales?.nombre || u.displayName || correoId,
-                correo: correoId,
-                roles: rolesFinales,
-                permisos: permisosPorDefecto(rolesFinales),
-                grupoAsignado: '',
-                tipoGrupoAsignado: '',
-                tutorAsignado: ''
-              })
+              const ADMIN_INICIAL = 'josue.jain@ibime.edu.mx';
+
+            const PERMISOS_ADMIN = {
+              verAlumnos: true,
+              verEstado: true,
+              verAlertas: true,
+              verDisponibilidad: true,
+              verHistorial: true,
+              verFaltas: true,
+              tomarAsistencia: true,
+              capturarRetardos: true,
+              salidaAnticipada: true,
+              editarAlumnos: true,
+              gestionarTiposSalida: true,
+              gestionarSupervisores: true,
+              cargarListado: true,
+              cargarHorario: true,
+              administrarUsuarios: true
+            };
               // onSnapshot se vuelve a disparar solo con el documento correcto.
             } catch (e) {
               console.error(
