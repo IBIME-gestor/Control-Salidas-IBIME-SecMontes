@@ -46,38 +46,49 @@ export function AuthProvider({ children }) {
       if (u) {
         const correoId = u.email.toLowerCase()
         const ref = doc(db, 'usuarios', correoId)
-        let intentoDeAlta = false
+        const esAdminInicial = CORREOS_ADMIN_INICIALES.map((c) => c.toLowerCase()).includes(correoId)
 
         unsubPerfil = onSnapshot(
           ref,
           async (snap) => {
-            if (snap.exists()) {
-              setPerfil({ id: snap.id, ...snap.data() })
+            const datosActuales = snap.exists() ? snap.data() : null
+            const yaEsAdminCorrecto =
+              !!datosActuales &&
+              Array.isArray(datosActuales.roles) &&
+              datosActuales.roles.length === 1 &&
+              datosActuales.roles[0] === ROLES.ADMIN
+
+            // Caso normal: ya existe y (si aplica) ya es admin correcto ->
+            // se muestra tal cual, sin tocar nada.
+            if (datosActuales && (!esAdminInicial || yaEsAdminCorrecto)) {
+              setPerfil({ id: snap.id, ...datosActuales })
               setCargando(false)
               return
             }
 
-            // No existe todavía: se autoaprovisiona una sola vez. Si el
-            // create falla (por ejemplo, sin conexión), no se reintenta en
-            // bucle; el listener seguirá esperando a que exista.
-            if (intentoDeAlta) return
-            intentoDeAlta = true
-            const esAdminInicial = CORREOS_ADMIN_INICIALES.map((c) => c.toLowerCase()).includes(correoId)
-            const rolesIniciales = esAdminInicial ? [ROLES.ADMIN] : [ROLES.COLABORADOR]
+            // No existe todavía, O tu correo está en CORREOS_ADMIN_INICIALES
+            // pero tu documento no refleja eso (por ejemplo, quedó como
+            // "colaborador" de una autoaprovisión anterior a que agregaras
+            // tu correo a la lista). En ambos casos, la app se autoaprovisiona
+            // o se "autosana" a sí misma con el rol que le corresponde. Esto
+            // funciona siempre que firestore.rules esté desplegado con la
+            // función puedeAutoAprovisionarse permitiendo tanto create como
+            // update para los correos de esa lista.
+            const rolesFinales = esAdminInicial ? [ROLES.ADMIN] : [ROLES.COLABORADOR]
             try {
               await setDoc(ref, {
-                nombre: u.displayName || correoId,
+                nombre: datosActuales?.nombre || u.displayName || correoId,
                 correo: correoId,
-                roles: rolesIniciales,
-                permisos: permisosPorDefecto(rolesIniciales),
+                roles: rolesFinales,
+                permisos: permisosPorDefecto(rolesFinales),
                 grupoAsignado: '',
                 tipoGrupoAsignado: '',
                 tutorAsignado: ''
               })
-              // onSnapshot se vuelve a disparar solo con el documento nuevo.
+              // onSnapshot se vuelve a disparar solo con el documento correcto.
             } catch (e) {
-              console.error('No se pudo autoaprovisionar el perfil:', e)
-              setPerfil(null)
+              console.error('No se pudo autoaprovisionar/autosanar el perfil:', e)
+              setPerfil(datosActuales ? { id: snap.id, ...datosActuales } : null)
               setCargando(false)
             }
           },
