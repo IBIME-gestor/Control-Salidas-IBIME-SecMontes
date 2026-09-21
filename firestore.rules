@@ -66,9 +66,60 @@ service cloud.firestore {
     }
 
     // --- usuarios (documento por correo, no por uid) ---
+
+    // Autoaprovisionamiento SIN Cloud Functions (plan gratuito): la lista
+    // de abajo debe ser EXACTAMENTE la misma que CORREOS_ADMIN_INICIALES
+    // en src/firebase.js. Si cambias una, cambia la otra.
+    function correoEsAdminInicial(correo) {
+      return correo in [
+        // 'direccion@ibime.edu.mx',
+      ];
+    }
+
+    function permisosColaboradorEsperados() {
+      return {
+        verAlumnos: true, verEstado: false, verAlertas: false, verDisponibilidad: false,
+        verHistorial: false, verFaltas: false, tomarAsistencia: false, capturarRetardos: false,
+        salidaAnticipada: false, editarAlumnos: false, gestionarTiposSalida: false,
+        gestionarSupervisores: false, cargarListado: false, cargarHorario: false,
+        administrarUsuarios: false
+      };
+    }
+
+    function permisosAdminEsperados() {
+      return {
+        verAlumnos: true, verEstado: true, verAlertas: true, verDisponibilidad: true,
+        verHistorial: true, verFaltas: true, tomarAsistencia: true, capturarRetardos: true,
+        salidaAnticipada: true, editarAlumnos: true, gestionarTiposSalida: true,
+        gestionarSupervisores: true, cargarListado: true, cargarHorario: true,
+        administrarUsuarios: true
+      };
+    }
+
+    // Cualquier correo del dominio puede crear SU PROPIO documento la
+    // primera vez que entra (mientras no exista todavía), pero solo con
+    // el rol y los privilegios exactos que le corresponden: administrador
+    // si su correo está en correoEsAdminInicial(), o colaborador (solo
+    // consulta de alumnos) en cualquier otro caso. No puede asignarse a sí
+    // mismo ningún otro rol ni prender ningún otro privilegio de entrada;
+    // eso solo lo cambia después alguien que ya sea administrador, desde
+    // el panel de Usuarios.
+    function puedeAutoAprovisionarse(correo) {
+      let esAdminIni = correoEsAdminInicial(correo);
+      return estaAutenticado() &&
+        request.auth.token.email == correo &&
+        request.resource.data.correo == correo &&
+        request.resource.data.roles == (esAdminIni ? ['administrador'] : ['colaborador']) &&
+        request.resource.data.permisos == (esAdminIni ? permisosAdminEsperados() : permisosColaboradorEsperados()) &&
+        request.resource.data.grupoAsignado == '' &&
+        request.resource.data.tipoGrupoAsignado == '' &&
+        request.resource.data.tutorAsignado == '';
+    }
+
     match /usuarios/{correo} {
       allow read: if estaAutenticado() && (request.auth.token.email == correo || esAdmin());
-      allow write: if esAdmin();
+      allow create: if esAdmin() || puedeAutoAprovisionarse(correo);
+      allow update, delete: if esAdmin();
     }
 
     // --- alumnos ---
