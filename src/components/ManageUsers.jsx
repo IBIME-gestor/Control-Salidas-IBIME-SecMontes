@@ -13,9 +13,10 @@ import {
 
 // Con login de Google no hace falta crear una cuenta de acceso: cualquier
 // persona con correo @ibime.edu.mx puede entrar, y en cuanto lo hace por
-// primera vez una función en la nube le crea aquí mismo un registro con
-// el rol "Colaborador" (solo consulta de alumnos y grupos). Desde esta
-// pantalla el administrador:
+// primera vez el propio navegador le crea aquí mismo un registro con el
+// rol "Colaborador" (solo consulta de alumnos y grupos) — sin Cloud
+// Functions ni plan de pago; firestore.rules valida que nadie pueda
+// autoasignarse otro rol. Desde esta pantalla el administrador:
 //   1) le cambia el/los ROL(ES) a esa persona (puede tener varios a la
 //      vez, por ejemplo Tutoría + Recepción), y
 //   2) dentro de esos roles, prende o apaga cada PRIVILEGIO puntual
