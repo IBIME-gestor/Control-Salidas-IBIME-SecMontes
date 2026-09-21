@@ -33,22 +33,10 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
 
-      - name: Instalar dependencias de Cloud Functions
-        run: npm ci
-        working-directory: functions
-
       - name: Publicar reglas de Firestore
         uses: w9jds/firebase-action@master
         with:
           args: deploy --only firestore:rules,firestore:indexes
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
-
-      - name: Publicar Cloud Functions (correo de retardos)
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only functions
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
