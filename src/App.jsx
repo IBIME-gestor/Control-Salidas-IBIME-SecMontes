@@ -17,18 +17,17 @@ export default function App() {
   if (!user) return <Login />
 
   if (!perfil) {
-    // Justo después del primer inicio de sesión con Google, una función en
-    // la nube crea automáticamente el perfil de la persona (como
-    // "colaborador", de solo consulta) en cuanto detecta la cuenta nueva.
-    // Puede tardar unos segundos; AuthContext escucha el documento en vivo
-    // (onSnapshot), así que esta pantalla desaparece sola cuando esté listo.
+    // Justo después del primer inicio de sesión con Google, el propio
+    // navegador crea el perfil de la persona (como "colaborador", de solo
+    // consulta) casi al instante. AuthContext escucha el documento en vivo
+    // (onSnapshot), así que esta pantalla desaparece sola en cuanto está listo.
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
         <div className="bg-white rounded-xl shadow-sm p-6 max-w-md text-center">
           <p className="text-gray-700 mb-2">Estamos preparando tu acceso...</p>
           <p className="text-sm text-gray-500">
-            Esto toma unos segundos la primera vez que entras. Si después de un minuto
-            sigue igual, pide al administrador que revise tu cuenta en el panel de Usuarios.
+            Esto toma solo un instante la primera vez que entras. Si sigue igual después de
+            recargar la página, pide al administrador que revise tu cuenta en el panel de Usuarios.
           </p>
         </div>
       </div>
