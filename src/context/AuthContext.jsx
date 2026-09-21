@@ -47,6 +47,13 @@ export function AuthProvider({ children }) {
         const correoId = u.email.toLowerCase()
         const ref = doc(db, 'usuarios', correoId)
         const esAdminInicial = CORREOS_ADMIN_INICIALES.map((c) => c.toLowerCase()).includes(correoId)
+        // Evita reintentar en bucle: cuando un intento de autoaprovisionar/
+        // autosanar se rechaza por permisos, Firestore hace "rollback" del
+        // escritura optimista local y eso dispara este mismo listener otra
+        // vez con los datos de antes — sin esta bandera, ese rollback se
+        // interpretaba como "hay que volver a intentar" y se entraba en un
+        // bucle infinito de escrituras rechazadas.
+        let intentoRealizado = false
 
         unsubPerfil = onSnapshot(
           ref,
@@ -66,14 +73,17 @@ export function AuthProvider({ children }) {
               return
             }
 
-            // No existe todavía, O tu correo está en CORREOS_ADMIN_INICIALES
-            // pero tu documento no refleja eso (por ejemplo, quedó como
-            // "colaborador" de una autoaprovisión anterior a que agregaras
-            // tu correo a la lista). En ambos casos, la app se autoaprovisiona
-            // o se "autosana" a sí misma con el rol que le corresponde. Esto
-            // funciona siempre que firestore.rules esté desplegado con la
-            // función puedeAutoAprovisionarse permitiendo tanto create como
-            // update para los correos de esa lista.
+            if (intentoRealizado) {
+              // Ya se intentó una vez en esta sesión y no se pudo (casi
+              // siempre porque firestore.rules todavía no tiene desplegada
+              // la versión que permite este autosanado). Se muestra lo que
+              // haya en vez de seguir reintentando.
+              setPerfil(datosActuales ? { id: snap.id, ...datosActuales } : null)
+              setCargando(false)
+              return
+            }
+            intentoRealizado = true
+
             const rolesFinales = esAdminInicial ? [ROLES.ADMIN] : [ROLES.COLABORADOR]
             try {
               await setDoc(ref, {
@@ -87,7 +97,10 @@ export function AuthProvider({ children }) {
               })
               // onSnapshot se vuelve a disparar solo con el documento correcto.
             } catch (e) {
-              console.error('No se pudo autoaprovisionar/autosanar el perfil:', e)
+              console.error(
+                'No se pudo autoaprovisionar/autosanar el perfil (revisa que firestore.rules esté desplegado con la última versión):',
+                e
+              )
               setPerfil(datosActuales ? { id: snap.id, ...datosActuales } : null)
               setCargando(false)
             }
