@@ -72,7 +72,7 @@ service cloud.firestore {
     // en src/firebase.js. Si cambias una, cambia la otra.
     function correoEsAdminInicial(correo) {
       return correo in [
-        // 'direccion@ibime.edu.mx',
+        // 'josue.jain@ibime.edu.mx',
       ];
     }
 
