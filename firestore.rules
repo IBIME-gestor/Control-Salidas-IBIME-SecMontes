@@ -74,7 +74,7 @@ service cloud.firestore {
     // en src/firebase.js. Si cambias una, cambia la otra.
     function correoEsAdminInicial(correo) {
       return correo in [
-        // 'josue.jain@ibime.edu.mx',
+        'josue.jain@ibime.edu.mx',
       ];
     }
 
@@ -99,13 +99,17 @@ service cloud.firestore {
     }
 
     // Cualquier correo del dominio puede crear SU PROPIO documento la
-    // primera vez que entra (mientras no exista todavía), pero solo con
-    // el rol y los privilegios exactos que le corresponden: administrador
-    // si su correo está en correoEsAdminInicial(), o colaborador (solo
-    // consulta de alumnos) en cualquier otro caso. No puede asignarse a sí
-    // mismo ningún otro rol ni prender ningún otro privilegio de entrada;
-    // eso solo lo cambia después alguien que ya sea administrador, desde
-    // el panel de Usuarios.
+    // primera vez que entra, y los correos de correoEsAdminInicial()
+    // además pueden SOBRESCRIBIR su propio documento en cualquier momento
+    // (create o update) para forzarlo de vuelta a rol administrador con
+    // todos los privilegios — es una especie de "cuenta de emergencia":
+    // si por lo que sea tu documento quedó mal (por ejemplo, como
+    // colaborador porque se autoaprovisionó antes de que agregaras tu
+    // correo a esta lista), la propia app se autosana sola al entrar, sin
+    // que nadie tenga que editar Firestore a mano. Un correo que NO está
+    // en la lista solo puede crear su documento una vez, como colaborador;
+    // no puede reescribirlo después (eso ya solo lo hace un administrador
+    // desde el panel de Usuarios).
     function puedeAutoAprovisionarse(correo) {
       let esAdminIni = correoEsAdminInicial(correo);
       return estaAutenticado() &&
@@ -121,7 +125,13 @@ service cloud.firestore {
     match /usuarios/{correo} {
       allow read: if estaAutenticado() && (request.auth.token.email.lower() == correo || esAdmin());
       allow create: if esAdmin() || puedeAutoAprovisionarse(correo);
-      allow update, delete: if esAdmin();
+      // El update de autoaprovisionamiento solo aplica para el propio
+      // correo Y solo si ese correo está en correoEsAdminInicial(): un
+      // colaborador normal NO puede reescribir su propio documento (ni a
+      // sí mismo lo puede "resucitar" a otro rol); solo puede hacerlo
+      // quien está en la lista de administradores iniciales.
+      allow update: if esAdmin() || (correoEsAdminInicial(correo) && puedeAutoAprovisionarse(correo));
+      allow delete: if esAdmin();
     }
 
     // --- alumnos ---
