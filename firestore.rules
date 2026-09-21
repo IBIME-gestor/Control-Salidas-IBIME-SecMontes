@@ -3,54 +3,79 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ============================================================
+    // AUTENTICACIÓN
+    // ============================================================
+
     function estaAutenticado() {
       return request.auth != null;
     }
 
-    // El perfil se busca por correo (no por uid). El correo del token de
-    // Google se normaliza con .lower() porque los documentos en /usuarios
-    // siempre se guardan con el correo en minúsculas (ver
-    // src/context/AuthContext.jsx y src/components/ManageUsers.jsx): sin
-    // esto, a alguien cuyo token traiga el correo con mayúsculas Firestore
-    // le negaría el acceso a su propio documento.
+    // ============================================================
+    // ADMINISTRADOR INICIAL
+    // ============================================================
+
+    function correoEsAdminInicial(correo) {
+      return correo == 'josue.jain@ibime.edu.mx';
+    }
+
+    // ============================================================
+    // PERFIL DEL USUARIO
+    // ============================================================
+
     function rutaPerfil() {
       return /databases/$(database)/documents/usuarios/$(request.auth.token.email.lower());
     }
 
-    // IMPORTANTE: get(...).data truena (error, no simplemente "vacío") si
-    // el documento no existe todavía — por ejemplo, la primerísima vez que
-    // alguien entra, antes de que su perfil se cree. Por eso SIEMPRE se
-    // revisa primero con exists(): el operador ?: es perezoso (no evalúa
-    // get() si exists() ya dio false), así que perfil() nunca truena.
     function perfilExiste() {
       return estaAutenticado() && exists(rutaPerfil());
     }
 
     function perfil() {
-      return perfilExiste() ? get(rutaPerfil()).data : {};
+      return perfilExiste()
+        ? get(rutaPerfil()).data
+        : {};
     }
 
-    // Un usuario puede tener uno o varios roles a la vez (perfil.roles).
-    function tieneRol(r) {
-      return perfilExiste() && ('roles' in perfil()) && (r in perfil().roles);
+    // ============================================================
+    // ROLES
+    // ============================================================
+
+    function tieneRol(rol) {
+      return perfilExiste()
+        && ('roles' in perfil())
+        && (rol in perfil().roles);
     }
+
+    // IMPORTANTE:
+    // El administrador inicial NO necesita existir todavía
+    // en Firestore para ser reconocido como administrador.
 
     function esAdmin() {
-      return tieneRol('administrador');
+      return estaAutenticado() &&
+        (
+          correoEsAdminInicial(request.auth.token.email.lower()) ||
+          tieneRol('administrador')
+        );
     }
 
-    // Único punto de verdad de privilegios: perfil.permisos siempre se
-    // guarda ya "expandido" (todas las llaves, en true/false) desde
-    // ManageUsers.jsx, así que aquí solo se lee el valor puntual. El
-    // administrador siempre tiene acceso total, tenga o no la llave.
+    // ============================================================
+    // PERMISOS
+    // ============================================================
+
     function tienePermiso(permiso) {
       return estaAutenticado() &&
-        (esAdmin() || (('permisos' in perfil()) && (permiso in perfil().permisos) && perfil().permisos[permiso] == true));
+        (
+          esAdmin() ||
+          (
+            perfilExiste() &&
+            ('permisos' in perfil()) &&
+            (permiso in perfil().permisos) &&
+            perfil().permisos[permiso] == true
+          )
+        );
     }
 
-    // Modelo: cada privilegio se prende/apaga por persona desde el panel
-    // de Usuarios (con un paquete por defecto según su rol), sin quedar
-    // atado de forma rígida a un solo rol fijo.
     function puedeEditarAlumnos() {
       return tienePermiso('editarAlumnos');
     }
@@ -71,147 +96,152 @@ service cloud.firestore {
       return tienePermiso('salidaAnticipada');
     }
 
-    // Permite que tutoría/recepción/supervisión sumen a los contadores de
-    // retardos/faltas del alumno (para alertas y el futuro correo al
-    // padre) SIN poder tocar ningún otro campo de su ficha — solo el
-    // administrador puede editar tipoSalidaId, diasSalida, etc.
+    // ============================================================
+    // ALUMNOS
+    // ============================================================
+
     function soloActualizaContadores() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['contadorRetardos', 'contadorFaltas']);
+      return request.resource.data
+        .diff(resource.data)
+        .affectedKeys()
+        .hasOnly([
+          'contadorRetardos',
+          'contadorFaltas'
+        ]);
     }
 
-    // --- usuarios (documento por correo, no por uid) ---
-
-    // Autoaprovisionamiento SIN Cloud Functions (plan gratuito): la lista
-    // de abajo debe ser EXACTAMENTE la misma que CORREOS_ADMIN_INICIALES
-    // en src/firebase.js. Si cambias una, cambia la otra.
-    function correoEsAdminInicial(correo) {
-      return correo in [
-        'josue.jain@ibime.edu.mx',
-      ];
-    }
-
-    function permisosColaboradorEsperados() {
-      return {
-        verAlumnos: true, verEstado: false, verAlertas: false, verDisponibilidad: false,
-        verHistorial: false, verFaltas: false, tomarAsistencia: false, capturarRetardos: false,
-        salidaAnticipada: false, editarAlumnos: false, gestionarTiposSalida: false,
-        gestionarSupervisores: false, cargarListado: false, cargarHorario: false,
-        administrarUsuarios: false
-      };
-    }
-
-    function permisosAdminEsperados() {
-      return {
-        verAlumnos: true, verEstado: true, verAlertas: true, verDisponibilidad: true,
-        verHistorial: true, verFaltas: true, tomarAsistencia: true, capturarRetardos: true,
-        salidaAnticipada: true, editarAlumnos: true, gestionarTiposSalida: true,
-        gestionarSupervisores: true, cargarListado: true, cargarHorario: true,
-        administrarUsuarios: true
-      };
-    }
-
-    // Cualquier correo del dominio puede crear SU PROPIO documento la
-    // primera vez que entra, y los correos de correoEsAdminInicial()
-    // además pueden SOBRESCRIBIR su propio documento en cualquier momento
-    // (create o update) para forzarlo de vuelta a rol administrador con
-    // todos los privilegios — es una especie de "cuenta de emergencia":
-    // si por lo que sea tu documento quedó mal (por ejemplo, como
-    // colaborador porque se autoaprovisionó antes de que agregaras tu
-    // correo a esta lista), la propia app se autosana sola al entrar, sin
-    // que nadie tenga que editar Firestore a mano. Un correo que NO está
-    // en la lista solo puede crear su documento una vez, como colaborador;
-    // no puede reescribirlo después (eso ya solo lo hace un administrador
-    // desde el panel de Usuarios).
-    function puedeAutoAprovisionarse(correo) {
-      let esAdminIni = correoEsAdminInicial(correo);
-      return estaAutenticado() &&
-        request.auth.token.email.lower() == correo &&
-        request.resource.data.correo == correo &&
-        request.resource.data.roles == (esAdminIni ? ['administrador'] : ['colaborador']) &&
-        request.resource.data.permisos == (esAdminIni ? permisosAdminEsperados() : permisosColaboradorEsperados()) &&
-        request.resource.data.grupoAsignado == '' &&
-        request.resource.data.tipoGrupoAsignado == '' &&
-        request.resource.data.tutorAsignado == '';
-    }
+    // ============================================================
+    // USUARIOS
+    // ============================================================
 
     match /usuarios/{correo} {
-      allow read: if estaAutenticado() && (request.auth.token.email.lower() == correo || esAdmin());
-      allow create: if esAdmin() || puedeAutoAprovisionarse(correo);
-      // El update de autoaprovisionamiento solo aplica para el propio
-      // correo Y solo si ese correo está en correoEsAdminInicial(): un
-      // colaborador normal NO puede reescribir su propio documento (ni a
-      // sí mismo lo puede "resucitar" a otro rol); solo puede hacerlo
-      // quien está en la lista de administradores iniciales.
-      allow update: if esAdmin() || (correoEsAdminInicial(correo) && puedeAutoAprovisionarse(correo));
+
+      // Un usuario puede consultar su propio perfil.
+      // Un administrador puede consultar cualquiera.
+      allow read: if estaAutenticado() &&
+        (
+          request.auth.token.email.lower() == correo ||
+          esAdmin()
+        );
+
+      // SOLO un administrador puede crear usuarios.
+      allow create: if esAdmin();
+
+      // SOLO un administrador puede modificar usuarios.
+      allow update: if esAdmin();
+
+      // SOLO un administrador puede eliminar usuarios.
       allow delete: if esAdmin();
     }
 
-    // --- alumnos ---
+    // ============================================================
+    // ALUMNOS
+    // ============================================================
+
     match /alumnos/{alumnoId} {
+
       allow read: if estaAutenticado();
+
       allow create: if puedeEditarAlumnos();
+
       allow update: if puedeEditarAlumnos() ||
-        ((puedeTomarAsistencia() || puedeCapturarRetardos()) && soloActualizaContadores());
+        (
+          (
+            puedeTomarAsistencia() ||
+            puedeCapturarRetardos()
+          ) &&
+          soloActualizaContadores()
+        );
+
       allow delete: if esAdmin();
 
-      // Comentarios/observaciones: cualquier autenticado puede dejarlos
-      // (principalmente docentes); nadie los edita ni borra una vez
-      // creados, para mantener el historial auditable.
+      // ----------------------------------------------------------
+      // COMENTARIOS
+      // ----------------------------------------------------------
+
       match /comentarios/{comentarioId} {
+
         allow read: if estaAutenticado();
+
         allow create: if estaAutenticado();
+
         allow update, delete: if esAdmin();
       }
     }
 
-    // --- tiposSalida ---
+    // ============================================================
+    // TIPOS DE SALIDA
+    // ============================================================
+
     match /tiposSalida/{tipoId} {
+
       allow read: if estaAutenticado();
+
       allow write: if puedeGestionarTiposSalida();
     }
 
-    // --- eventos: bitácora operativa diaria ---
-    // Es un registro inmutable: se crea, no se edita ni se borra (salvo el
-    // administrador). Cualquier autenticado puede crear eventos normales
-    // (salida/traslado/entrega desde el docente, falta/retardo desde
-    // asistencia), pero SALIDA_ANTICIPADA solo la crean recepción,
-    // supervisión o admin.
+    // ============================================================
+    // EVENTOS
+    // ============================================================
+
     match /eventos/{eventoId} {
+
       allow read: if estaAutenticado();
+
       allow create: if estaAutenticado() &&
-        (request.resource.data.accion != 'SALIDA_ANTICIPADA' || puedeOtorgarSalidaAnticipada());
+        (
+          request.resource.data.accion != 'SALIDA_ANTICIPADA' ||
+          puedeOtorgarSalidaAnticipada()
+        );
+
       allow update, delete: if esAdmin();
     }
 
-    // --- supervisores: catálogo de guardias por día ---
+    // ============================================================
+    // SUPERVISORES
+    // ============================================================
+
     match /supervisores/{supervisorId} {
+
       allow read: if estaAutenticado();
+
       allow write: if puedeGestionarTiposSalida();
     }
 
-    // --- asistencia: pase de lista diario ---
-    // Solo tutoría (y admin) toman/corrigen lista; recepción/supervisión
-    // también pueden escribir aquí porque su captura de "retardo" en la
-    // entrada también se guarda en esta misma colección.
+    // ============================================================
+    // ASISTENCIA
+    // ============================================================
+
     match /asistencia/{asistenciaId} {
+
       allow read: if estaAutenticado();
-      allow create, update: if puedeTomarAsistencia() || puedeCapturarRetardos();
+
+      allow create, update: if
+        puedeTomarAsistencia() ||
+        puedeCapturarRetardos();
+
       allow delete: if esAdmin();
     }
 
-    // --- meta: documento único con listas de tutores/grupos ---
+    // ============================================================
+    // META
+    // ============================================================
+
     match /meta/{metaId} {
+
       allow read: if estaAutenticado();
+
       allow write: if esAdmin();
     }
 
-    // --- horarios: una fila = una clase (día, hora, grupo, materia,
-    // docente, salón). Cambia poco (una vez por semestre); solo el
-    // administrador lo carga/edita, todos lo pueden consultar (para el
-    // módulo de disponibilidad).
+    // ============================================================
+    // HORARIOS
+    // ============================================================
+
     match /horarios/{horarioId} {
+
       allow read: if estaAutenticado();
+
       allow write: if esAdmin();
     }
   }
