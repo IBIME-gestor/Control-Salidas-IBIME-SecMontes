@@ -1,3 +1,13 @@
+// ⚠️ ESTE ARCHIVO NO SE DESPLIEGA en este proyecto actualmente: requiere
+// el plan de pago Blaze de Firebase, y este despliegue se dejó
+// intencionalmente 100% en el plan gratuito Spark (ver README.md,
+// sección "Cloud Functions desactivadas en este despliegue"). El alta
+// automática de usuarios ya NO depende de este archivo — ahora la hace el
+// propio navegador junto con firestore.rules (ver src/context/AuthContext.jsx
+// y la función puedeAutoAprovisionarse en firestore.rules). Este código
+// se queda solo como referencia por si más adelante activan el plan
+// Blaze y quieren el correo automático a padres por retardos/faltas.
+
 const { onDocumentCreated } = require('firebase-functions/v2/firestore')
 const functionsV1 = require('firebase-functions/v1')
 const { defineSecret } = require('firebase-functions/params')
@@ -8,7 +18,7 @@ const logger = require('firebase-functions/logger')
 initializeApp()
 const db = getFirestore()
 
-// --- Alta automática de usuarios --------------------------------------
+// --- Alta automática de usuarios (YA NO SE USA, ver nota arriba) -------
 // Correos que entran como Administrador desde su PRIMER inicio de
 // sesión. Edítalo aquí (y vuelve a desplegar con
 // `firebase deploy --only functions`) para agregar o quitar
@@ -16,7 +26,7 @@ const db = getFirestore()
 // administrador puede promover a alguien más desde el panel de Usuarios
 // sin tocar código.
 const CORREOS_ADMIN_INICIALES = [
-  // 'josue.jain@ibime.edu.mx',
+  // 'director@ibime.edu.mx',
 ]
 
 const DOMINIO_PERMITIDO = 'ibime.edu.mx'
