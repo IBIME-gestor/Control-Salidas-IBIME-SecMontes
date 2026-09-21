@@ -29,7 +29,7 @@ export const DOMINIO_PERMITIDO = 'ibime.edu.mx'
 // también allá, o el navegador lo va a intentar pero las reglas lo van a
 // rechazar.
 export const CORREOS_ADMIN_INICIALES = [
-  // 'josue.jain@ibime.edu.mx',
+  'josue.jain@ibime.edu.mx',
 ]
 
 export const googleProvider = new GoogleAuthProvider()
