@@ -7,12 +7,14 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // El perfil se busca por correo (no por uid): con login de Google, una
-    // Cloud Function (ver functions/index.js) crea automáticamente el
-    // perfil de cada persona la primera vez que entra, con rol
-    // "colaborador" salvo que sea uno de los administradores iniciales.
+    // El perfil se busca por correo (no por uid). El correo del token de
+    // Google se normaliza con .lower() porque los documentos en /usuarios
+    // siempre se guardan con el correo en minúsculas (ver
+    // src/context/AuthContext.jsx y src/components/ManageUsers.jsx): sin
+    // esto, a alguien cuyo token traiga el correo con mayúsculas Firestore
+    // le negaría el acceso a su propio documento.
     function perfil() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.token.email)).data;
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.token.email.lower())).data;
     }
 
     // Un usuario puede tener uno o varios roles a la vez (perfil.roles).
@@ -107,7 +109,7 @@ service cloud.firestore {
     function puedeAutoAprovisionarse(correo) {
       let esAdminIni = correoEsAdminInicial(correo);
       return estaAutenticado() &&
-        request.auth.token.email == correo &&
+        request.auth.token.email.lower() == correo &&
         request.resource.data.correo == correo &&
         request.resource.data.roles == (esAdminIni ? ['administrador'] : ['colaborador']) &&
         request.resource.data.permisos == (esAdminIni ? permisosAdminEsperados() : permisosColaboradorEsperados()) &&
@@ -117,7 +119,7 @@ service cloud.firestore {
     }
 
     match /usuarios/{correo} {
-      allow read: if estaAutenticado() && (request.auth.token.email == correo || esAdmin());
+      allow read: if estaAutenticado() && (request.auth.token.email.lower() == correo || esAdmin());
       allow create: if esAdmin() || puedeAutoAprovisionarse(correo);
       allow update, delete: if esAdmin();
     }
