@@ -20,6 +20,18 @@ export const db = getFirestore(app)
 // AuthContext.jsx, donde se valida además del lado del cliente).
 export const DOMINIO_PERMITIDO = 'ibime.edu.mx'
 
+// Autoaprovisionamiento SIN Cloud Functions (plan Firebase Spark/gratis):
+// cualquier correo @ibime.edu.mx que entre por primera vez se da de alta
+// solo, del lado del navegador, como "colaborador" (solo consulta). Si su
+// correo está en esta lista, se da de alta como "administrador" en vez de
+// colaborador. Esta MISMA lista está copiada en firestore.rules (función
+// correoEsAdminInicial) — si agregas o quitas un correo aquí, cámbialo
+// también allá, o el navegador lo va a intentar pero las reglas lo van a
+// rechazar.
+export const CORREOS_ADMIN_INICIALES = [
+  // 'direccion@ibime.edu.mx',
+]
+
 export const googleProvider = new GoogleAuthProvider()
 // "hd" (hosted domain) le dice a Google que muestre solo cuentas de ese
 // dominio en el selector — es una ayuda de UI, no una garantía de
