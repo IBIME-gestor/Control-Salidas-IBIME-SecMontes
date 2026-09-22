@@ -130,6 +130,7 @@ export default function EstanciaPanel() {
                 <th className="p-2 text-left">Nombre</th>
                 <th className="p-2 text-left">Grado</th>
                 <th className="p-2 text-left">Grupo</th>
+                <th className="p-2 text-left">Docente</th>
                 <th className="p-2 text-left">Motivo del traslado</th>
                 <th className="p-2 text-left">Enviado</th>
               </tr>
@@ -144,13 +145,14 @@ export default function EstanciaPanel() {
                   <td className="p-2 font-medium">{e.nombreAlumno}</td>
                   <td className="p-2">{etiquetaGrado(e.grado)}</td>
                   <td className="p-2">{e.grupoEspanol || e.grupoIngles}</td>
+                  <td className="p-2 text-gray-600">{e.autorNombre || '—'}</td>
                   <td className="p-2 text-gray-500">{e.motivo}</td>
                   <td className="p-2 text-gray-400">{e.hora?.slice(0, 5)}</td>
                 </tr>
               ))}
               {!pendientes.length && (
                 <tr>
-                  <td colSpan={7} className="p-4 text-center text-gray-400">No hay alumnos pendientes por recibir.</td>
+                  <td colSpan={8} className="p-4 text-center text-gray-400">No hay alumnos pendientes por recibir.</td>
                 </tr>
               )}
             </tbody>
