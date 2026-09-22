@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { auth, db, DOMINIO_PERMITIDO, CORREOS_ADMIN_INICIALES } from '../firebase.js'
-import { ROLES, permisosPorDefecto } from '../utils/roles.js'
+import { ROLES, ROL_AUTOAPROVISIONAMIENTO, permisosPorDefecto } from '../utils/roles.js'
 
 const AuthContext = createContext(null)
 
@@ -84,27 +84,31 @@ export function AuthProvider({ children }) {
             }
             intentoRealizado = true
 
-            const rolesFinales = esAdminInicial ? [ROLES.ADMIN] : [ROLES.COLABORADOR]
+            // Rol con el que cae automáticamente cualquier cuenta nueva:
+            // administrador si su correo está en CORREOS_ADMIN_INICIALES,
+            // o el rol de autoaprovisionamiento (Docente) en cualquier
+            // otro caso. Sus privilegios se calculan igual que en
+            // ManageUsers (permisosPorDefecto), así queda consistente
+            // sin importar quién dio de alta la cuenta.
+            const rolesFinales = esAdminInicial ? [ROLES.ADMIN] : [ROL_AUTOAPROVISIONAMIENTO]
             try {
-              const ADMIN_INICIAL = 'josue.jain@ibime.edu.mx';
-
-            const PERMISOS_ADMIN = {
-              verAlumnos: true,
-              verEstado: true,
-              verAlertas: true,
-              verDisponibilidad: true,
-              verHistorial: true,
-              verFaltas: true,
-              tomarAsistencia: true,
-              capturarRetardos: true,
-              salidaAnticipada: true,
-              editarAlumnos: true,
-              gestionarTiposSalida: true,
-              gestionarSupervisores: true,
-              cargarListado: true,
-              cargarHorario: true,
-              administrarUsuarios: true
-            };
+              await setDoc(
+                ref,
+                {
+                  nombre: u.displayName || correoId,
+                  correo: correoId,
+                  roles: rolesFinales,
+                  permisos: permisosPorDefecto(rolesFinales),
+                  // Docente/estancia empiezan sin grupo ni salón: el
+                  // administrador los configura desde "Usuarios" (o
+                  // "Estancia") en cuanto vea entrar a la persona.
+                  grupoAsignado: '',
+                  tipoGrupoAsignado: '',
+                  gruposAsignados: [],
+                  tutorAsignado: ''
+                },
+                { merge: true }
+              )
               // onSnapshot se vuelve a disparar solo con el documento correcto.
             } catch (e) {
               console.error(
