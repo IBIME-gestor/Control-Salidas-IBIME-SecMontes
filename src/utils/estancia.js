@@ -1,4 +1,4 @@
-import { doc, onSnapshot } from 'firebase/firestore'
+import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase.js'
 
 // asignacionesEstancia/{correo}
@@ -40,4 +40,23 @@ export function gradosDeHoy(asignacion, dia) {
 export function salonParaGradoHoy(asignacion, dia, grado) {
   const turno = turnosDeHoy(asignacion, dia).find((t) => (t.grados || []).includes(grado))
   return turno?.salon || ''
+}
+
+// Todas las asignaciones de estancia (colección pequeña: un puñado de
+// profes con sus turnos), usada por el docente para saber a qué salón le
+// toca trasladar a cada grado hoy, sin saber de antemano a quién.
+export function suscribirTodasAsignacionesEstancia(callback) {
+  return onSnapshot(collection(db, COLECCION_ASIGNACIONES_ESTANCIA), (snap) => {
+    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+  })
+}
+
+// Busca, entre TODAS las asignaciones de estancia, el salón que hoy
+// recibe un grado dado. Devuelve '' si nadie tiene ese grado hoy.
+export function salonParaGradoHoyEntreTodas(asignaciones, dia, grado) {
+  for (const a of asignaciones || []) {
+    const salon = salonParaGradoHoy(a, dia, grado)
+    if (salon) return salon
+  }
+  return ''
 }
