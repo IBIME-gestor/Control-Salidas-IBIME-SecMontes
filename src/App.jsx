@@ -6,7 +6,8 @@ import AdminPanel from './pages/AdminPanel.jsx'
 import GestionPanel from './pages/GestionPanel.jsx'
 import DocentePanel from './pages/DocentePanel.jsx'
 import EstanciaPanel from './pages/EstanciaPanel.jsx'
-import { esAdmin, esDocente, esEstancia } from './utils/roles.js'
+import TransportePanel from './pages/TransportePanel.jsx'
+import { esAdmin, esDocente, esEstancia, esTransporte } from './utils/roles.js'
 
 export default function App() {
   const { user, perfil, cargando } = useAuth()
@@ -42,7 +43,8 @@ export default function App() {
       {esAdmin(perfil) && <AdminPanel />}
       {!esAdmin(perfil) && esDocente(perfil) && <DocentePanel />}
       {!esAdmin(perfil) && !esDocente(perfil) && esEstancia(perfil) && <EstanciaPanel />}
-      {!esAdmin(perfil) && !esDocente(perfil) && !esEstancia(perfil) && <GestionPanel />}
+      {!esAdmin(perfil) && !esDocente(perfil) && !esEstancia(perfil) && esTransporte(perfil) && <TransportePanel />}
+      {!esAdmin(perfil) && !esDocente(perfil) && !esEstancia(perfil) && !esTransporte(perfil) && <GestionPanel />}
     </div>
   )
 }
