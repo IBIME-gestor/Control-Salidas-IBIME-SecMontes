@@ -22,9 +22,10 @@ export const DOMINIO_PERMITIDO = 'ibime.edu.mx'
 
 // Autoaprovisionamiento SIN Cloud Functions (plan Firebase Spark/gratis):
 // cualquier correo @ibime.edu.mx que entre por primera vez se da de alta
-// solo, del lado del navegador, como "colaborador" (solo consulta). Si su
-// correo está en esta lista, se da de alta como "administrador" en vez de
-// colaborador. Esta MISMA lista está copiada en firestore.rules (función
+// solo, del lado del navegador, como "docente" (sin grupo asignado
+// todavía; ver ROL_AUTOAPROVISIONAMIENTO en utils/roles.js). Si su correo
+// está en esta lista, se da de alta como "administrador" en vez de
+// docente. Esta MISMA lista está copiada en firestore.rules (función
 // correoEsAdminInicial) — si agregas o quitas un correo aquí, cámbialo
 // también allá, o el navegador lo va a intentar pero las reglas lo van a
 // rechazar.
