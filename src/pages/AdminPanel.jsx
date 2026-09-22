@@ -5,6 +5,7 @@ import ManageUsers from '../components/ManageUsers.jsx'
 import ManageExitTypes from '../components/ManageExitTypes.jsx'
 import ManageSupervisores from '../components/ManageSupervisores.jsx'
 import ManageEstancia from '../components/ManageEstancia.jsx'
+import { TransporteContenido } from './TransportePanel.jsx'
 import StudentsTable from '../components/StudentsTable.jsx'
 import EstadoHoyBoard from '../components/EstadoHoyBoard.jsx'
 import HistorialEventos from '../components/HistorialEventos.jsx'
@@ -30,6 +31,7 @@ const TABS = [
   { id: 'tipos', label: 'Tipos de salida' },
   { id: 'supervisores', label: 'Supervisores' },
   { id: 'estancia', label: 'Estancia' },
+  { id: 'transporte', label: 'Transporte' },
   { id: 'usuarios', label: 'Usuarios' }
 ]
 
@@ -66,6 +68,7 @@ export default function AdminPanel() {
       {tab === 'tipos' && <ManageExitTypes />}
       {tab === 'supervisores' && <ManageSupervisores />}
       {tab === 'estancia' && <ManageEstancia />}
+      {tab === 'transporte' && <TransporteContenido />}
       {tab === 'usuarios' && <ManageUsers />}
     </div>
   )
