@@ -23,7 +23,7 @@ import {
 //   2) dentro de esos roles, prende o apaga cada PRIVILEGIO puntual
 //      (qué puede ver y qué puede hacer), sin quedar atado a lo que ese
 //      rol trae "de fábrica".
-const ROLES_ASIGNABLES = [ROLES.ADMIN, ROLES.DOCENTE, ROLES.ESTANCIA, ...ROLES_PANEL_PRIVILEGIOS]
+const ROLES_ASIGNABLES = [ROLES.ADMIN, ROLES.DOCENTE, ROLES.ESTANCIA, ROLES.TRANSPORTE, ...ROLES_PANEL_PRIVILEGIOS]
 
 function grupoVacio() {
   return { tipo: 'grupoEspanol', valor: '' }
