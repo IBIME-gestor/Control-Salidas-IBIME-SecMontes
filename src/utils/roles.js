@@ -23,6 +23,7 @@ export const ROLES = {
   TUTORIA: 'tutoria',
   CONTRALORIA: 'contraloria',
   DOCENTE: 'docente',
+  ESTANCIA: 'estancia',
   COLABORADOR: 'colaborador'
 }
 
@@ -34,8 +35,16 @@ export const ROLE_LABELS = {
   [ROLES.TUTORIA]: 'Tutoría',
   [ROLES.CONTRALORIA]: 'Contraloría',
   [ROLES.DOCENTE]: 'Docente',
+  [ROLES.ESTANCIA]: 'Estancia',
   [ROLES.COLABORADOR]: 'Colaborador'
 }
+
+// Rol que recibe cualquier cuenta @dominio la PRIMERA vez que entra con
+// Google, sin que nadie la haya dado de alta a mano (ver AuthContext.jsx).
+// La mayoría del personal que entra por primera vez es docente operando
+// la salida de su grupo, así que ese es el rol por defecto (antes era
+// "colaborador"); el administrador puede cambiarlo después sin problema.
+export const ROL_AUTOAPROVISIONAMIENTO = ROLES.DOCENTE
 
 // Roles que se asignan y combinan con el sistema de permisos (todo menos
 // admin y docente, que tienen su propio panel dedicado y su propia
@@ -87,6 +96,7 @@ export const PERMISO_LABELS = {
   [PERMISOS.ADMINISTRAR_USUARIOS]: 'Administrar usuarios'
 }
 
+
 const CONSULTA_BASICA = [PERMISOS.VER_ALUMNOS]
 const CONSULTA_AMPLIADA = [
   PERMISOS.VER_ALUMNOS,
@@ -108,6 +118,9 @@ export const PERMISOS_POR_ROL = {
   [ROLES.RECEPCION]: [...CONSULTA_AMPLIADA, PERMISOS.CAPTURAR_RETARDOS, PERMISOS.SALIDA_ANTICIPADA],
   [ROLES.TUTORIA]: [...CONSULTA_AMPLIADA, PERMISOS.TOMAR_ASISTENCIA],
   [ROLES.DOCENTE]: [],
+  // Estancia, igual que Docente, es un panel aparte con su propia lógica
+  // de acceso (ver EstanciaPanel.jsx): no usa el sistema de privilegios.
+  [ROLES.ESTANCIA]: [],
   [ROLES.ADMIN]: Object.values(PERMISOS)
 }
 
@@ -141,6 +154,28 @@ export function esAdmin(perfil) {
 
 export function esDocente(perfil) {
   return getRoles(perfil).includes(ROLES.DOCENTE)
+}
+
+export function esEstancia(perfil) {
+  return getRoles(perfil).includes(ROLES.ESTANCIA)
+}
+
+// Un docente puede tener asignado más de un grupo (por ejemplo, si da
+// clase a varios grupos y necesita elegir con cuál termina el día antes
+// de registrar la salida). Se guarda como perfil.gruposAsignados = [{
+// tipo: 'grupoEspanol'|'grupoIngles', valor }]. Por compatibilidad con
+// cuentas dadas de alta antes de este cambio, si no existe ese arreglo se
+// arma uno de un solo elemento a partir de los campos viejos
+// grupoAsignado/tipoGrupoAsignado.
+export function getGruposAsignados(perfil) {
+  if (!perfil) return []
+  if (Array.isArray(perfil.gruposAsignados) && perfil.gruposAsignados.length) {
+    return perfil.gruposAsignados
+  }
+  if (perfil.grupoAsignado) {
+    return [{ tipo: perfil.tipoGrupoAsignado || 'grupoEspanol', valor: perfil.grupoAsignado }]
+  }
+  return []
 }
 
 // Único punto de verdad del lado del cliente: ¿esta persona tiene
