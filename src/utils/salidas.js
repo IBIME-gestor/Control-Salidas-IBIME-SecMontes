@@ -60,7 +60,7 @@ async function escribirPorLotes(items, agregar) {
 // grupoDocente = { tipo: 'grupoEspanol'|'grupoIngles', valor } (el grupo con
 // el que el docente termina su día; sirve para saber quién lo registró).
 
-export async function registrarSalidas({ alumnos, tiposSalida = [], grupoDocente = null, autor }) {
+export async function registrarSalidas({ alumnos, tiposSalida = [], grupoDocente = null, autor, extrasPorAlumno = {} }) {
   const ahora = new Date()
   const fecha = fechaHoyISO(ahora)
   const dia = nombreDiaHoy(ahora)
@@ -68,6 +68,7 @@ export async function registrarSalidas({ alumnos, tiposSalida = [], grupoDocente
   await escribirPorLotes(alumnos, (batch, alumno) => {
     const tipo = tiposSalida.find((t) => t.id === alumno.tipoSalidaId) || null
     const programacion = estadoSalidaProgramada(alumno, tipo, dia)
+    const extraAlumno = extrasPorAlumno[alumno.id] || {}
 
     batch.set(
       doc(collection(db, 'eventos')),
@@ -78,7 +79,7 @@ export async function registrarSalidas({ alumnos, tiposSalida = [], grupoDocente
         autorUid: autor.uid,
         autorNombre: autor.nombre,
         ahora,
-        extra: { origen: 'docente', grupoDocente: grupoDocente?.valor || '' }
+        extra: { origen: 'docente', grupoDocente: grupoDocente?.valor || '', ...extraAlumno }
       })
     )
 
@@ -107,7 +108,11 @@ export async function registrarSalidas({ alumnos, tiposSalida = [], grupoDocente
       tipoGrupoDocente: grupoDocente?.tipo || '',
       docenteUid: autor.uid || null,
       docenteNombre: autor.nombre || '',
-      docenteCorreo: autor.correo || ''
+      docenteCorreo: autor.correo || '',
+      // '' si no tiene transporte asignado; 'si'/'no' si el docente
+      // confirmó (ver TransporteAlumnoAlerta.jsx) que el alumno tenía o no
+      // la información de su transporte antes de salir.
+      transporteConfirmado: extraAlumno.transporteConfirmado || ''
     })
   })
 }
