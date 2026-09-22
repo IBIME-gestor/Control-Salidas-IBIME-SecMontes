@@ -19,6 +19,10 @@ service cloud.firestore {
       return correo == 'josue.jain@ibime.edu.mx';
     }
 
+    function esCorreoPropio(correo) {
+      return estaAutenticado() && request.auth.token.email.lower() == correo;
+    }
+
     // ============================================================
     // PERFIL DEL USUARIO
     // ============================================================
@@ -97,6 +101,30 @@ service cloud.firestore {
     }
 
     // ============================================================
+    // AUTOAPROVISIONAMIENTO (alta automática al primer inicio de sesión)
+    // ============================================================
+    //
+    // El navegador (src/context/AuthContext.jsx) crea el propio perfil de
+    // la persona la primera vez que entra con Google. Esta es la barrera
+    // real de seguridad para eso: SOLO se permite crear el documento con
+    // el correo propio, SOLO si no existía ya, y SOLO con el rol
+    // "docente" (o "administrador" si el correo está en la lista de
+    // administradores iniciales) — nunca con otro rol, ni con un grupo o
+    // tutoría ya asignados de entrada.
+    function esAutoAprovisionamientoValido(correo) {
+      return esCorreoPropio(correo) &&
+        !perfilExiste() &&
+        ('roles' in request.resource.data) &&
+        request.resource.data.roles.size() == 1 &&
+        (
+          (correoEsAdminInicial(correo) && request.resource.data.roles[0] == 'administrador') ||
+          (!correoEsAdminInicial(correo) && request.resource.data.roles[0] == 'docente')
+        ) &&
+        request.resource.data.grupoAsignado == '' &&
+        request.resource.data.tutorAsignado == '';
+    }
+
+    // ============================================================
     // ALUMNOS
     // ============================================================
 
@@ -124,8 +152,10 @@ service cloud.firestore {
           esAdmin()
         );
 
-      // SOLO un administrador puede crear usuarios.
-      allow create: if esAdmin();
+      // Un administrador puede crear usuarios. Cualquier otra persona
+      // SOLO puede crear su propio documento, y solo como autoaprovisionamiento
+      // válido (ver función arriba) — nunca con un rol o privilegios de más.
+      allow create: if esAdmin() || esAutoAprovisionamientoValido(correo);
 
       // SOLO un administrador puede modificar usuarios.
       allow update: if esAdmin();
@@ -239,6 +269,47 @@ service cloud.firestore {
     // ============================================================
 
     match /horarios/{horarioId} {
+
+      allow read: if estaAutenticado();
+
+      allow write: if esAdmin();
+    }
+
+    // ============================================================
+    // SALIDA (bitácora de salida normal, por fecha, para consultas
+    // posteriores — ver src/utils/salidas.js)
+    // ============================================================
+    //
+    //   salida/registro/{fecha}/{alumnoId}
+    //
+    // Cualquier persona autenticada puede registrar (la pantalla de
+    // salida del docente y la de estancia son las únicas que escriben
+    // aquí); solo el administrador puede corregir o borrar un registro
+    // ya guardado.
+
+    match /salida/{fijo} {
+
+      allow read: if estaAutenticado();
+      allow write: if esAdmin();
+
+      match /{fecha}/{alumnoId} {
+
+        allow read: if estaAutenticado();
+        allow create, update: if estaAutenticado();
+        allow delete: if esAdmin();
+      }
+    }
+
+    // ============================================================
+    // ASIGNACIONES DE ESTANCIA
+    // ============================================================
+    //
+    // Qué días, en qué salón y para qué grado(s) recibe alumnos cada
+    // profe de estancia. Lo administra solo el administrador desde el
+    // panel "Estancia"; cualquier persona autenticada puede leerlo (lo
+    // necesita el propio profe de estancia para saber su turno de hoy).
+
+    match /asignacionesEstancia/{correo} {
 
       allow read: if estaAutenticado();
 
