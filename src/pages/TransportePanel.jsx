@@ -228,11 +228,25 @@ function CatalogoRutas() {
   )
 }
 
+// Contenido sin el contenedor de página (padding/max-width): se usa así
+// dentro de AdminPanel, que ya trae su propio contenedor, para que el
+// administrador también tenga acceso directo a esta función sin
+// necesidad de que le den aparte el rol "Transporte".
+export function TransporteContenido() {
+  return (
+    <div className="max-w-4xl">
+      <BuscarAlumno />
+      <CatalogoRutas />
+    </div>
+  )
+}
+
+// Página completa, con su propio contenedor: la usa App.jsx para quien
+// tiene el rol "Transporte" como panel único.
 export default function TransportePanel() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <BuscarAlumno />
-      <CatalogoRutas />
+      <TransporteContenido />
     </div>
   )
 }
