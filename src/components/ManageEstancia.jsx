@@ -4,6 +4,53 @@ import { db, DOMINIO_PERMITIDO } from '../firebase.js'
 import { DIAS_SEMANA } from '../utils/roles.js'
 import { GRADOS, etiquetaGrado } from '../utils/grados.js'
 import { COLECCION_ASIGNACIONES_ESTANCIA } from '../utils/estancia.js'
+import { suscribirConfigEstancia, guardarHoraTrasladoEstancia } from '../utils/configuracion.js'
+
+function ConfigHoraTraslado() {
+  const [config, setConfig] = useState(null)
+  const [hora, setHora] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  useEffect(() => suscribirConfigEstancia(setConfig), [])
+  useEffect(() => {
+    if (config) setHora(config.horaTraslado || '')
+  }, [config])
+
+  async function guardar(e) {
+    e.preventDefault()
+    setGuardando(true)
+    try {
+      await guardarHoraTrasladoEstancia(hora)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+      <h2 className="font-semibold text-gray-800 mb-2">Hora de traslado a estancia</h2>
+      <p className="text-xs text-gray-500 mb-4">
+        A partir de esta hora (de México), el panel del docente muestra una alerta indicando que los
+        alumnos pendientes (sin pase o que no salieron) deben trasladarse a estancia.
+      </p>
+      <form onSubmit={guardar} className="flex items-center gap-3">
+        <input
+          type="time"
+          value={hora}
+          onChange={(e) => setHora(e.target.value)}
+          className="border rounded-lg px-3 py-2 text-sm"
+        />
+        <button
+          disabled={guardando}
+          className="bg-[#10395a] text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-[#0c2c47] disabled:opacity-50"
+        >
+          {guardando ? 'Guardando...' : 'Guardar hora'}
+        </button>
+        {config?.horaTraslado && <span className="text-xs text-gray-500">Actual: {config.horaTraslado}</span>}
+      </form>
+    </div>
+  )
+}
 
 function nuevoIdTurno() {
   return `t_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -145,7 +192,9 @@ export default function ManageEstancia() {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+    <>
+      <ConfigHoraTraslado />
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
       <h2 className="font-semibold text-gray-800 mb-2">Estancia</h2>
       <p className="text-xs text-gray-500 mb-4">
         Define, por correo, qué días, en qué salón y para qué grado(s) recibe alumnos cada profe de
@@ -264,6 +313,7 @@ export default function ManageEstancia() {
         ))}
         {!asignaciones.length && <p className="text-sm text-gray-400 text-center py-4">Sin profes de estancia asignados todavía.</p>}
       </div>
-    </div>
+      </div>
+    </>
   )
 }
