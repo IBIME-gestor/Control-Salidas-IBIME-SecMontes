@@ -24,6 +24,7 @@ export const ROLES = {
   CONTRALORIA: 'contraloria',
   DOCENTE: 'docente',
   ESTANCIA: 'estancia',
+  TRANSPORTE: 'transporte',
   COLABORADOR: 'colaborador'
 }
 
@@ -36,6 +37,7 @@ export const ROLE_LABELS = {
   [ROLES.CONTRALORIA]: 'Contraloría',
   [ROLES.DOCENTE]: 'Docente',
   [ROLES.ESTANCIA]: 'Estancia',
+  [ROLES.TRANSPORTE]: 'Coordinador de transporte',
   [ROLES.COLABORADOR]: 'Colaborador'
 }
 
@@ -121,6 +123,9 @@ export const PERMISOS_POR_ROL = {
   // Estancia, igual que Docente, es un panel aparte con su propia lógica
   // de acceso (ver EstanciaPanel.jsx): no usa el sistema de privilegios.
   [ROLES.ESTANCIA]: [],
+  // Transporte, igual que Docente/Estancia, es un panel aparte (ver
+  // TransportePanel.jsx): no usa el sistema de privilegios.
+  [ROLES.TRANSPORTE]: [],
   [ROLES.ADMIN]: Object.values(PERMISOS)
 }
 
@@ -158,6 +163,10 @@ export function esDocente(perfil) {
 
 export function esEstancia(perfil) {
   return getRoles(perfil).includes(ROLES.ESTANCIA)
+}
+
+export function esTransporte(perfil) {
+  return getRoles(perfil).includes(ROLES.TRANSPORTE)
 }
 
 // Un docente puede tener asignado más de un grupo (por ejemplo, si da
