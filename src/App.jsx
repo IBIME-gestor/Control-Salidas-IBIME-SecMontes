@@ -5,7 +5,8 @@ import Navbar from './components/Navbar.jsx'
 import AdminPanel from './pages/AdminPanel.jsx'
 import GestionPanel from './pages/GestionPanel.jsx'
 import DocentePanel from './pages/DocentePanel.jsx'
-import { esAdmin, esDocente } from './utils/roles.js'
+import EstanciaPanel from './pages/EstanciaPanel.jsx'
+import { esAdmin, esDocente, esEstancia } from './utils/roles.js'
 
 export default function App() {
   const { user, perfil, cargando } = useAuth()
@@ -18,9 +19,10 @@ export default function App() {
 
   if (!perfil) {
     // Justo después del primer inicio de sesión con Google, el propio
-    // navegador crea el perfil de la persona (como "colaborador", de solo
-    // consulta) casi al instante. AuthContext escucha el documento en vivo
-    // (onSnapshot), así que esta pantalla desaparece sola en cuanto está listo.
+    // navegador crea el perfil de la persona (como "docente", sin grupo
+    // asignado todavía) casi al instante. AuthContext escucha el documento
+    // en vivo (onSnapshot), así que esta pantalla desaparece sola en cuanto
+    // está listo.
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
         <div className="bg-white rounded-xl shadow-sm p-6 max-w-md text-center">
@@ -39,7 +41,8 @@ export default function App() {
       <Navbar />
       {esAdmin(perfil) && <AdminPanel />}
       {!esAdmin(perfil) && esDocente(perfil) && <DocentePanel />}
-      {!esAdmin(perfil) && !esDocente(perfil) && <GestionPanel />}
+      {!esAdmin(perfil) && !esDocente(perfil) && esEstancia(perfil) && <EstanciaPanel />}
+      {!esAdmin(perfil) && !esDocente(perfil) && !esEstancia(perfil) && <GestionPanel />}
     </div>
   )
 }
