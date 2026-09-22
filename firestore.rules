@@ -315,5 +315,65 @@ service cloud.firestore {
 
       allow write: if esAdmin();
     }
+
+    // ============================================================
+    // CONFIGURACIÓN GENERAL
+    // ============================================================
+    //
+    // configuracion/estancia → { horaTraslado: "HH:MM" }, la hora a
+    // partir de la cual el panel del docente avisa que ya deben
+    // trasladarse los alumnos pendientes a estancia. Solo el
+    // administrador la cambia; cualquiera autenticado la lee.
+
+    match /configuracion/{id} {
+
+      allow read: if estaAutenticado();
+
+      allow write: if esAdmin();
+    }
+
+    // ============================================================
+    // SELECCIÓN DIARIA DEL DOCENTE
+    // ============================================================
+    //
+    // seleccionDiaria/{fecha}_{correo} → con qué grupo termina el día
+    // cada docente, o si tiene "hora administrativa". Cada quien solo
+    // puede escribir SU PROPIA selección (nunca la de alguien más); el
+    // administrador puede leer y corregir cualquiera.
+
+    match /seleccionDiaria/{id} {
+
+      allow read: if estaAutenticado();
+
+      allow create, update: if esAdmin() ||
+        (estaAutenticado() && request.resource.data.correo == request.auth.token.email.lower());
+
+      allow delete: if esAdmin();
+    }
+
+    // ============================================================
+    // TRANSPORTE
+    // ============================================================
+    //
+    // rutasTransporte/{id}        → catálogo de rutas con su operador.
+    // transporteAlumnos/{alumnoId} → qué ruta/operador tiene cada alumno.
+    //
+    // Las administra el administrador o quien tenga el rol Transporte
+    // (coordinador de transporte); cualquier persona autenticada puede
+    // leerlas — el docente necesita verlas al momento de la salida.
+
+    match /rutasTransporte/{id} {
+
+      allow read: if estaAutenticado();
+
+      allow write: if esAdmin() || tieneRol('transporte');
+    }
+
+    match /transporteAlumnos/{alumnoId} {
+
+      allow read: if estaAutenticado();
+
+      allow write: if esAdmin() || tieneRol('transporte');
+    }
   }
 }
