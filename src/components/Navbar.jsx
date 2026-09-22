@@ -1,6 +1,7 @@
 import React from 'react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { ROLE_LABELS, getRoles } from '../utils/roles.js'
+import RelojMexico from './RelojMexico.jsx'
 
 export default function Navbar() {
   const { perfil, user, signOut } = useAuth()
@@ -18,12 +19,16 @@ export default function Navbar() {
           </p>
         </div>
       </div>
-      <button
-        onClick={signOut}
-        className="text-sm text-gray-600 hover:text-[#e31e24] border rounded-lg px-3 py-1.5"
-      >
-        Cerrar sesión
-      </button>
+      <div className="flex items-center gap-4">
+        <RelojMexico />
+        <button
+          onClick={signOut}
+          className="text-sm text-gray-600 hover:text-[#e31e24] border rounded-lg px-3 py-1.5"
+        >
+          Cerrar sesión
+        </button>
+      </div>
     </div>
   )
 }
+
