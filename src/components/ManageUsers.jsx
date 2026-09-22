@@ -8,21 +8,68 @@ import {
   PERMISOS,
   PERMISO_LABELS,
   permisosPorDefecto,
-  getRoles
+  getRoles,
+  getGruposAsignados
 } from '../utils/roles.js'
 
 // Con login de Google no hace falta crear una cuenta de acceso: cualquier
 // persona con correo @ibime.edu.mx puede entrar, y en cuanto lo hace por
 // primera vez el propio navegador le crea aquí mismo un registro con el
-// rol "Colaborador" (solo consulta de alumnos y grupos) — sin Cloud
-// Functions ni plan de pago; firestore.rules valida que nadie pueda
-// autoasignarse otro rol. Desde esta pantalla el administrador:
+// rol "Docente" (sin grupo asignado todavía) — sin Cloud Functions ni
+// plan de pago; firestore.rules valida que nadie pueda autoasignarse
+// otro rol. Desde esta pantalla el administrador:
 //   1) le cambia el/los ROL(ES) a esa persona (puede tener varios a la
 //      vez, por ejemplo Tutoría + Recepción), y
 //   2) dentro de esos roles, prende o apaga cada PRIVILEGIO puntual
 //      (qué puede ver y qué puede hacer), sin quedar atado a lo que ese
 //      rol trae "de fábrica".
-const ROLES_ASIGNABLES = [ROLES.ADMIN, ROLES.DOCENTE, ...ROLES_PANEL_PRIVILEGIOS]
+const ROLES_ASIGNABLES = [ROLES.ADMIN, ROLES.DOCENTE, ROLES.ESTANCIA, ...ROLES_PANEL_PRIVILEGIOS]
+
+function grupoVacio() {
+  return { tipo: 'grupoEspanol', valor: '' }
+}
+
+// Un docente puede tener varios grupos asignados (por si da clase a más
+// de uno) y elige, al momento de la salida, con cuál termina el día.
+function ChecklistGrupos({ grupos, onChange }) {
+  function actualizar(i, campo, valor) {
+    onChange(grupos.map((g, idx) => (idx === i ? { ...g, [campo]: valor } : g)))
+  }
+  function quitar(i) {
+    onChange(grupos.filter((_, idx) => idx !== i))
+  }
+  function agregar() {
+    onChange([...grupos, grupoVacio()])
+  }
+  return (
+    <div className="space-y-2">
+      {grupos.map((g, i) => (
+        <div key={i} className="flex gap-2">
+          <select
+            value={g.tipo}
+            onChange={(e) => actualizar(i, 'tipo', e.target.value)}
+            className="border rounded-lg px-2 py-2 text-sm"
+          >
+            <option value="grupoEspanol">Grupo español</option>
+            <option value="grupoIngles">Grupo inglés</option>
+          </select>
+          <input
+            placeholder="Nombre exacto del grupo"
+            value={g.valor}
+            onChange={(e) => actualizar(i, 'valor', e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm flex-1"
+          />
+          <button type="button" onClick={() => quitar(i)} className="text-red-600 text-xs hover:underline px-2">
+            Quitar
+          </button>
+        </div>
+      ))}
+      <button type="button" onClick={agregar} className="text-xs text-[#10395a] hover:underline">
+        + Agregar otro grupo
+      </button>
+    </div>
+  )
+}
 
 function ChecklistRoles({ rolesSeleccionados, onChange }) {
   function toggle(r) {
@@ -64,8 +111,7 @@ export default function ManageUsers() {
   const [correo, setCorreo] = useState('')
   const [rolesNuevo, setRolesNuevo] = useState([ROLES.COLABORADOR])
   const [permisosNuevo, setPermisosNuevo] = useState(permisosPorDefecto([ROLES.COLABORADOR]))
-  const [grupoAsignado, setGrupoAsignado] = useState('')
-  const [tipoGrupoAsignado, setTipoGrupoAsignado] = useState('grupoEspanol')
+  const [gruposAsignados, setGruposAsignados] = useState([grupoVacio()])
   const [tutorAsignado, setTutorAsignado] = useState('')
   const [estado, setEstado] = useState('')
   const [editandoId, setEditandoId] = useState(null)
@@ -100,19 +146,24 @@ export default function ManageUsers() {
     }
     setEstado('Guardando...')
     try {
+      const gruposValidos = esDocenteNuevo
+        ? gruposAsignados.filter((g) => g.valor.trim()).map((g) => ({ tipo: g.tipo, valor: g.valor.trim() }))
+        : []
       await setDoc(doc(db, 'usuarios', correoNormalizado), {
         nombre: nombre.trim(),
         correo: correoNormalizado,
         roles: rolesNuevo,
         permisos: esAdminNuevo ? permisosPorDefecto([ROLES.ADMIN]) : permisosNuevo,
-        grupoAsignado: esDocenteNuevo ? grupoAsignado.trim() : '',
-        tipoGrupoAsignado: esDocenteNuevo ? tipoGrupoAsignado : '',
+        gruposAsignados: gruposValidos,
+        // Campos viejos, en desuso, se dejan vacíos (ver getGruposAsignados en utils/roles.js).
+        grupoAsignado: '',
+        tipoGrupoAsignado: '',
         tutorAsignado: esTutoriaNuevo ? tutorAsignado.trim() : ''
       })
       setEstado(`${correoNormalizado} dado de alta. Ya puede entrar con su cuenta de Google.`)
       setNombre('')
       setCorreo('')
-      setGrupoAsignado('')
+      setGruposAsignados([grupoVacio()])
       setTutorAsignado('')
       cambiarRolesNuevo([ROLES.COLABORADOR])
     } catch (err) {
@@ -127,8 +178,7 @@ export default function ManageUsers() {
     setEdicion({
       roles,
       permisos: u.permisos && Object.keys(u.permisos).length ? { ...u.permisos } : permisosPorDefecto(roles),
-      grupoAsignado: u.grupoAsignado || '',
-      tipoGrupoAsignado: u.tipoGrupoAsignado || 'grupoEspanol',
+      gruposAsignados: getGruposAsignados(u).length ? getGruposAsignados(u).map((g) => ({ ...g })) : [grupoVacio()],
       tutorAsignado: u.tutorAsignado || ''
     })
   }
@@ -147,11 +197,15 @@ export default function ManageUsers() {
     const esDocenteEdit = edicion.roles.includes(ROLES.DOCENTE)
     const esTutoriaEdit = edicion.roles.includes(ROLES.TUTORIA)
     try {
+      const gruposValidos = esDocenteEdit
+        ? edicion.gruposAsignados.filter((g) => g.valor.trim()).map((g) => ({ tipo: g.tipo, valor: g.valor.trim() }))
+        : []
       await updateDoc(doc(db, 'usuarios', id), {
         roles: edicion.roles,
         permisos: esAdminEdit ? permisosPorDefecto([ROLES.ADMIN]) : edicion.permisos,
-        grupoAsignado: esDocenteEdit ? edicion.grupoAsignado.trim() : '',
-        tipoGrupoAsignado: esDocenteEdit ? edicion.tipoGrupoAsignado : '',
+        gruposAsignados: gruposValidos,
+        grupoAsignado: '',
+        tipoGrupoAsignado: '',
         tutorAsignado: esTutoriaEdit ? edicion.tutorAsignado.trim() : ''
       })
       cancelarEdicion()
@@ -172,8 +226,8 @@ export default function ManageUsers() {
       <p className="text-xs text-gray-500 mb-4">
         No hay contraseñas: cualquiera con correo @{DOMINIO_PERMITIDO} entra con su cuenta de
         Google. La primera vez que alguien entra queda dado de alta automáticamente como
-        "Colaborador" (solo puede ver alumnos y grupos). Aquí puedes darle de alta manualmente
-        de una vez con otro rol, o después ajustarle el rol y los privilegios exactos.
+        "Docente" (sin grupo asignado todavía). Aquí puedes darle de alta manualmente de una vez
+        con otro rol, o después ajustarle el rol, el grupo y los privilegios exactos.
       </p>
 
       <form onSubmit={darDeAlta} className="border rounded-xl p-4 mb-6 space-y-3">
@@ -201,21 +255,11 @@ export default function ManageUsers() {
         </div>
 
         {esDocenteNuevo && (
-          <div className="flex gap-2">
-            <select
-              value={tipoGrupoAsignado}
-              onChange={(e) => setTipoGrupoAsignado(e.target.value)}
-              className="border rounded-lg px-2 py-2 text-sm"
-            >
-              <option value="grupoEspanol">Grupo español</option>
-              <option value="grupoIngles">Grupo inglés</option>
-            </select>
-            <input
-              placeholder="Nombre exacto del grupo"
-              value={grupoAsignado}
-              onChange={(e) => setGrupoAsignado(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm flex-1"
-            />
+          <div>
+            <p className="text-xs font-medium text-gray-600 mb-1.5">
+              Grupo(s) con los que puede terminar el día (elige uno al momento de la salida si tiene varios)
+            </p>
+            <ChecklistGrupos grupos={gruposAsignados} onChange={setGruposAsignados} />
           </div>
         )}
         {esTutoriaNuevo && (
@@ -265,8 +309,10 @@ export default function ManageUsers() {
                   <td className="p-2">{u.correo || u.id}</td>
                   <td className="p-2">{getRoles(u).map((r) => ROLE_LABELS[r] || r).join(' / ') || '—'}</td>
                   <td className="p-2">
-                    {u.grupoAsignado
-                      ? `${u.grupoAsignado} (${u.tipoGrupoAsignado === 'grupoIngles' ? 'inglés' : 'español'})`
+                    {getGruposAsignados(u).length
+                      ? getGruposAsignados(u)
+                          .map((g) => `${g.valor} (${g.tipo === 'grupoIngles' ? 'inglés' : 'español'})`)
+                          .join(', ')
                       : u.tutorAsignado
                       ? `Tutoría: ${u.tutorAsignado}`
                       : '—'}
@@ -298,22 +344,20 @@ export default function ManageUsers() {
                       </div>
 
                       {edicion.roles.includes(ROLES.DOCENTE) && (
-                        <div className="flex gap-2">
-                          <select
-                            value={edicion.tipoGrupoAsignado}
-                            onChange={(e) => setEdicion((p) => ({ ...p, tipoGrupoAsignado: e.target.value }))}
-                            className="border rounded-lg px-2 py-2 text-sm"
-                          >
-                            <option value="grupoEspanol">Grupo español</option>
-                            <option value="grupoIngles">Grupo inglés</option>
-                          </select>
-                          <input
-                            placeholder="Nombre exacto del grupo"
-                            value={edicion.grupoAsignado}
-                            onChange={(e) => setEdicion((p) => ({ ...p, grupoAsignado: e.target.value }))}
-                            className="border rounded-lg px-3 py-2 text-sm flex-1"
+                        <div>
+                          <p className="text-xs font-medium text-gray-600 mb-1.5">
+                            Grupo(s) con los que puede terminar el día
+                          </p>
+                          <ChecklistGrupos
+                            grupos={edicion.gruposAsignados}
+                            onChange={(gruposAsignados) => setEdicion((p) => ({ ...p, gruposAsignados }))}
                           />
                         </div>
+                      )}
+                      {edicion.roles.includes(ROLES.ESTANCIA) && (
+                        <p className="text-xs text-gray-500">
+                          El turno (días, salón y grado) de estancia se configura en la pestaña "Estancia", por correo.
+                        </p>
                       )}
                       {edicion.roles.includes(ROLES.TUTORIA) && (
                         <input
