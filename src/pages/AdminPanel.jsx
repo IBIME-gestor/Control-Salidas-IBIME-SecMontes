@@ -15,44 +15,19 @@ import CapturaLlegadasTarde from '../components/CapturaLlegadasTarde.jsx'
 import SalidaAnticipada from '../components/SalidaAnticipada.jsx'
 import DisponibilidadHorario from '../components/DisponibilidadHorario.jsx'
 import AlertasAsistencia from '../components/AlertasAsistencia.jsx'
+import ConsultarReportes from '../components/ConsultarReportes.jsx'
+import NavegacionModulos from '../components/NavegacionModulos.jsx'
+import { MODULOS, armarCategorias } from '../utils/modulos.js'
 
-const TABS = [
-  { id: 'estado', label: 'Estado de hoy' },
-  { id: 'alertas', label: 'Alertas' },
-  { id: 'disponibilidad', label: 'Disponibilidad' },
-  { id: 'llegadas', label: 'Llegadas tarde' },
-  { id: 'anticipada', label: 'Salida anticipada' },
-  { id: 'asistencia', label: 'Pase de lista' },
-  { id: 'alumnos', label: 'Alumnos' },
-  { id: 'historial', label: 'Historial' },
-  { id: 'faltas', label: 'Faltas' },
-  { id: 'carga', label: 'Cargar listado' },
-  { id: 'horario', label: 'Cargar horario' },
-  { id: 'tipos', label: 'Tipos de salida' },
-  { id: 'supervisores', label: 'Supervisores' },
-  { id: 'estancia', label: 'Estancia' },
-  { id: 'transporte', label: 'Transporte' },
-  { id: 'usuarios', label: 'Usuarios' }
-]
+const IDS_MODULOS = Object.keys(MODULOS)
+const CATEGORIAS_ADMIN = armarCategorias(IDS_MODULOS)
 
 export default function AdminPanel() {
   const [tab, setTab] = useState('estado')
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex flex-wrap gap-2 mb-6">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              tab === t.id ? 'bg-[#10395a] text-white' : 'bg-white text-gray-600 border'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <NavegacionModulos categorias={CATEGORIAS_ADMIN} activo={tab} onChange={setTab} />
 
       {tab === 'estado' && <EstadoHoyBoard />}
       {tab === 'alertas' && <AlertasAsistencia />}
@@ -61,6 +36,7 @@ export default function AdminPanel() {
       {tab === 'anticipada' && <SalidaAnticipada />}
       {tab === 'asistencia' && <TomarAsistencia />}
       {tab === 'alumnos' && <StudentsTable editable allowComments={false} />}
+      {tab === 'consultar' && <ConsultarReportes />}
       {tab === 'historial' && <HistorialEventos />}
       {tab === 'faltas' && <FaltasPanel />}
       {tab === 'carga' && <UploadStudents />}
