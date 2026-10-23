@@ -1,11 +1,11 @@
 ```yaml
 name: Deploy a Firebase Hosting
 
-# Todo se ejecuta en los servidores de GitHub.
 on:
   push:
-    branches: [main]
-  workflow_dispatch: {}
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
