@@ -17,7 +17,6 @@ export default function App() {
   }
 
   if (!user) return <Login />
-
   if (!perfil) {
     // Justo después del primer inicio de sesión con Google, el propio
     // navegador crea el perfil de la persona (como "docente", sin grupo
