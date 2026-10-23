@@ -9,7 +9,10 @@ import React from 'react'
  *   activo:     id del módulo seleccionado
  *   onCambiar:  (idModulo) => void
  */
-export default function NavegacionModulos({ categorias, activo, onCambiar }) {
+export default function NavegacionModulos({ categorias, activo, onCambiar, onChange }) {
+  // Los paneles pasan 'onChange'; se acepta también 'onCambiar'.
+  const cambiar = onCambiar || onChange
+
   const categoriaActiva =
     categorias.find((c) => c.modulos.some((m) => m.id === activo)) || categorias[0]
 
@@ -23,7 +26,7 @@ export default function NavegacionModulos({ categorias, activo, onCambiar }) {
           return (
             <button
               key={c.id}
-              onClick={() => onCambiar(c.modulos[0].id)}
+              onClick={() => cambiar(c.modulos[0].id)}
               title={c.descripcion}
               className={`px-4 py-2 rounded-lg text-sm font-semibold border transition ${
                 seleccionada
@@ -43,7 +46,7 @@ export default function NavegacionModulos({ categorias, activo, onCambiar }) {
           {categoriaActiva.modulos.map((m) => (
             <button
               key={m.id}
-              onClick={() => onCambiar(m.id)}
+              onClick={() => cambiar(m.id)}
               className={`px-3 py-1.5 rounded-md text-sm font-medium ${
                 activo === m.id
                   ? 'bg-[#e31e24] text-white'
