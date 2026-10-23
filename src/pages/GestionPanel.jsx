@@ -8,6 +8,9 @@ import CapturaLlegadasTarde from '../components/CapturaLlegadasTarde.jsx'
 import SalidaAnticipada from '../components/SalidaAnticipada.jsx'
 import DisponibilidadHorario from '../components/DisponibilidadHorario.jsx'
 import AlertasAsistencia from '../components/AlertasAsistencia.jsx'
+import ConsultarReportes from '../components/ConsultarReportes.jsx'
+import NavegacionModulos from '../components/NavegacionModulos.jsx'
+import { armarCategorias } from '../utils/modulos.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { tienePermiso, PERMISOS } from '../utils/roles.js'
 
@@ -25,21 +28,27 @@ export default function GestionPanel() {
 
   const puede = (permiso) => tienePermiso(perfil, permiso)
 
-  const tabs = [
-    ...(puede(PERMISOS.VER_ESTADO) ? [{ id: 'estado', label: 'Estado de hoy' }] : []),
-    ...(puede(PERMISOS.VER_ALERTAS) ? [{ id: 'alertas', label: 'Alertas' }] : []),
-    ...(puede(PERMISOS.VER_DISPONIBILIDAD) ? [{ id: 'disponibilidad', label: 'Disponibilidad' }] : []),
-    ...(puede(PERMISOS.CAPTURAR_RETARDOS) ? [{ id: 'llegadas', label: 'Llegadas tarde' }] : []),
-    ...(puede(PERMISOS.SALIDA_ANTICIPADA) ? [{ id: 'anticipada', label: 'Salida anticipada' }] : []),
-    ...(puede(PERMISOS.TOMAR_ASISTENCIA) ? [{ id: 'asistencia', label: 'Pase de lista' }] : []),
-    ...(puede(PERMISOS.VER_ALUMNOS) ? [{ id: 'alumnos', label: 'Alumnos' }] : []),
-    ...(puede(PERMISOS.VER_HISTORIAL) ? [{ id: 'historial', label: 'Historial' }] : []),
-    ...(puede(PERMISOS.VER_FALTAS) ? [{ id: 'faltas', label: 'Faltas' }] : [])
+  // Ids de los módulos a los que esta persona tiene acceso. "consultar"
+  // se abre con su propio privilegio (consultarReportes) y, para no
+  // dejar fuera a cuentas creadas antes de que existiera, también con el
+  // de ver historial.
+  const idsDisponibles = [
+    ...(puede(PERMISOS.VER_ESTADO) ? ['estado'] : []),
+    ...(puede(PERMISOS.VER_ALERTAS) ? ['alertas'] : []),
+    ...(puede(PERMISOS.VER_DISPONIBILIDAD) ? ['disponibilidad'] : []),
+    ...(puede(PERMISOS.CAPTURAR_RETARDOS) ? ['llegadas'] : []),
+    ...(puede(PERMISOS.SALIDA_ANTICIPADA) ? ['anticipada'] : []),
+    ...(puede(PERMISOS.TOMAR_ASISTENCIA) ? ['asistencia'] : []),
+    ...(puede(PERMISOS.CONSULTAR_REPORTES) || puede(PERMISOS.VER_HISTORIAL) ? ['consultar'] : []),
+    ...(puede(PERMISOS.VER_HISTORIAL) ? ['historial'] : []),
+    ...(puede(PERMISOS.VER_FALTAS) ? ['faltas'] : []),
+    ...(puede(PERMISOS.VER_ALUMNOS) ? ['alumnos'] : [])
   ]
+  const categorias = armarCategorias(idsDisponibles)
 
-  const tabActiva = tab && tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id
+  const tabActiva = tab && idsDisponibles.includes(tab) ? tab : categorias[0]?.modulos[0]?.id
 
-  if (!tabs.length) {
+  if (!categorias.length) {
     return (
       <div className="p-6 max-w-7xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm p-6 text-center text-gray-500">
@@ -52,19 +61,7 @@ export default function GestionPanel() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex flex-wrap gap-2 mb-6">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${
-              tabActiva === t.id ? 'bg-[#10395a] text-white' : 'bg-white text-gray-600 border'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <NavegacionModulos categorias={categorias} activo={tabActiva} onChange={setTab} />
       {tabActiva === 'estado' && <EstadoHoyBoard />}
       {tabActiva === 'alertas' && <AlertasAsistencia />}
       {tabActiva === 'disponibilidad' && <DisponibilidadHorario />}
@@ -75,6 +72,7 @@ export default function GestionPanel() {
           "Editar alumnos" (por defecto, solo el administrador) puede
           editar la ficha; el resto de roles solo consultan. */}
       {tabActiva === 'alumnos' && <StudentsTable editable={false} allowComments={false} />}
+      {tabActiva === 'consultar' && <ConsultarReportes />}
       {tabActiva === 'historial' && <HistorialEventos />}
       {tabActiva === 'faltas' && <FaltasPanel />}
     </div>
