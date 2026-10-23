@@ -69,6 +69,7 @@ export const PERMISOS = {
   VER_DISPONIBILIDAD: 'verDisponibilidad',
   VER_HISTORIAL: 'verHistorial',
   VER_FALTAS: 'verFaltas',
+  CONSULTAR_REPORTES: 'consultarReportes',
   TOMAR_ASISTENCIA: 'tomarAsistencia',
   CAPTURAR_RETARDOS: 'capturarRetardos',
   SALIDA_ANTICIPADA: 'salidaAnticipada',
@@ -87,6 +88,7 @@ export const PERMISO_LABELS = {
   [PERMISOS.VER_DISPONIBILIDAD]: 'Ver disponibilidad de horario',
   [PERMISOS.VER_HISTORIAL]: 'Ver historial de eventos',
   [PERMISOS.VER_FALTAS]: 'Ver faltas',
+  [PERMISOS.CONSULTAR_REPORTES]: 'Consultar y descargar reportes (Excel/PDF)',
   [PERMISOS.TOMAR_ASISTENCIA]: 'Tomar pase de lista',
   [PERMISOS.CAPTURAR_RETARDOS]: 'Capturar llegadas tarde',
   [PERMISOS.SALIDA_ANTICIPADA]: 'Otorgar salida anticipada',
@@ -106,7 +108,8 @@ const CONSULTA_AMPLIADA = [
   PERMISOS.VER_ALERTAS,
   PERMISOS.VER_DISPONIBILIDAD,
   PERMISOS.VER_HISTORIAL,
-  PERMISOS.VER_FALTAS
+  PERMISOS.VER_FALTAS,
+  PERMISOS.CONSULTAR_REPORTES
 ]
 
 // Privilegios por DEFECTO al asignar cada rol. Son solo el punto de
