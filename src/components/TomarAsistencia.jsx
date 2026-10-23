@@ -26,38 +26,71 @@ export default function TomarAsistencia() {
   // tutoría siempre trabaja con su propio grupo (perfil.tutorAsignado).
   const esGestion = esAdmin(perfil)
 
-  const [meta, setMeta] = useState({ tutores: [] })
+  const [meta, setMeta] = useState({ tutores: [], gruposEspanol: [], gruposIngles: [] })
   const [alumnos, setAlumnos] = useState([])
   const [asistenciaHoy, setAsistenciaHoy] = useState({})
-  const [tutorSeleccionado, setTutorSeleccionado] = useState('')
+  const [anticipadasHoy, setAnticipadasHoy] = useState({})
+  // Cómo se busca la lista: por grupo de español, grupo de inglés o tutor.
+  // Si la cuenta es de tutoría con tutor asignado, arranca en su tutor.
+  const [modo, setModo] = useState(!esGestion && perfil?.tutorAsignado ? 'tutor' : 'espanol')
+  const [valorSeleccionado, setValorSeleccionado] = useState(
+    !esGestion && perfil?.tutorAsignado ? perfil.tutorAsignado : ''
+  )
   const [horaLlegada, setHoraLlegada] = useState({})
   const fecha = fechaHoyISO()
 
-  const tutorActivo = esGestion ? tutorSeleccionado : perfil?.tutorAsignado || ''
+  const CAMPO_POR_MODO = { espanol: 'grupoEspanol', ingles: 'grupoIngles', tutor: 'tutor' }
+  const campo = CAMPO_POR_MODO[modo]
+  const valorActivo = valorSeleccionado
+  const opciones =
+    modo === 'espanol' ? meta.gruposEspanol : modo === 'ingles' ? meta.gruposIngles : meta.tutores
 
   useEffect(() => {
-    if (esGestion) {
-      const unsub = suscribirMetaFiltros(setMeta)
-      return () => unsub()
-    }
-  }, [esGestion])
+    const unsub = suscribirMetaFiltros(setMeta)
+    return () => unsub()
+  }, [])
 
   useEffect(() => {
-    if (!tutorActivo) {
+    if (!valorActivo) {
       setAlumnos([])
       return
     }
-    const q = query(collection(db, 'alumnos'), where('tutor', '==', tutorActivo), orderBy('nombre'))
+    const q = query(collection(db, 'alumnos'), where(campo, '==', valorActivo), orderBy('nombre'))
     const unsub = onSnapshot(q, (snap) => setAlumnos(snap.docs.map((d) => ({ id: d.id, ...d.data() }))))
     return () => unsub()
-  }, [tutorActivo])
+  }, [campo, valorActivo])
+
+  // Salidas anticipadas de HOY para este grupo/tutor (el último evento por alumno).
+  useEffect(() => {
+    if (!valorActivo) {
+      setAnticipadasHoy({})
+      return
+    }
+    const q = query(
+      collection(db, 'eventos'),
+      where('fecha', '==', fecha),
+      where('accion', '==', ACCIONES.SALIDA_ANTICIPADA),
+      where(campo, '==', valorActivo)
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      const mapa = {}
+      snap.docs
+        .map((d) => d.data())
+        .sort((a, b) => String(a.timestampISO).localeCompare(String(b.timestampISO)))
+        .forEach((e) => {
+          mapa[e.alumnoId] = e
+        })
+      setAnticipadasHoy(mapa)
+    })
+    return () => unsub()
+  }, [campo, valorActivo, fecha])
 
   useEffect(() => {
-    if (!tutorActivo) {
+    if (!valorActivo) {
       setAsistenciaHoy({})
       return
     }
-    const q = query(collection(db, 'asistencia'), where('fecha', '==', fecha), where('tutor', '==', tutorActivo))
+    const q = query(collection(db, 'asistencia'), where('fecha', '==', fecha), where(campo, '==', valorActivo))
     const unsub = onSnapshot(q, (snap) => {
       const mapa = {}
       snap.docs.forEach((d) => {
@@ -66,7 +99,7 @@ export default function TomarAsistencia() {
       setAsistenciaHoy(mapa)
     })
     return () => unsub()
-  }, [tutorActivo, fecha])
+  }, [campo, valorActivo, fecha])
 
   async function marcar(alumno, estadoNuevo, horaLlegadaValor = '') {
     const ref = doc(db, 'asistencia', idAsistencia(fecha, alumno.id))
@@ -110,46 +143,53 @@ export default function TomarAsistencia() {
     }
   }
 
-  if (!esGestion && !perfil?.tutorAsignado) {
-    return (
-      <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm">
-        Tu cuenta de tutoría no tiene un tutor asignado todavía. Pide al administrador que lo
-        configure en el panel de usuarios (debe coincidir exactamente con el campo "tutor" del
-        listado de alumnos).
-      </div>
-    )
-  }
-
   const totalAusentes = Object.values(asistenciaHoy).filter((a) => a.estado === ESTADOS_ASISTENCIA.AUSENTE).length
   const totalRetardos = Object.values(asistenciaHoy).filter((a) => a.estado === ESTADOS_ASISTENCIA.RETARDO).length
+  const totalAnticipadas = alumnos.filter((a) => anticipadasHoy[a.id]).length
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h2 className="font-semibold text-gray-800">Pase de lista ({fecha})</h2>
-        {esGestion && (
+        <div className="flex flex-wrap items-center gap-2">
           <select
-            value={tutorSeleccionado}
-            onChange={(e) => setTutorSeleccionado(e.target.value)}
+            value={modo}
+            onChange={(e) => {
+              setModo(e.target.value)
+              setValorSeleccionado('')
+            }}
             className="border rounded-lg px-3 py-2 text-sm"
           >
-            <option value="">Selecciona un tutor</option>
-            {meta.tutores.map((t) => <option key={t} value={t}>{t}</option>)}
+            <option value="espanol">Grupo de español</option>
+            <option value="ingles">Grupo de inglés</option>
+            <option value="tutor">Tutor</option>
           </select>
-        )}
+          <select
+            value={valorSeleccionado}
+            onChange={(e) => setValorSeleccionado(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm"
+          >
+            <option value="">
+              {modo === 'tutor' ? 'Selecciona un tutor' : 'Selecciona un grupo'}
+            </option>
+            {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
       </div>
 
-      {!tutorActivo && esGestion && (
-        <p className="text-sm text-gray-400 text-center py-6">Elige un tutor para ver y tomar su lista.</p>
+      {!valorActivo && (
+        <p className="text-sm text-gray-400 text-center py-6">
+          Elige un grupo (o un tutor) para ver y tomar la lista.
+        </p>
       )}
 
-      {tutorActivo && (
+      {valorActivo && (
         <>
           <p className="text-xs text-gray-500 mb-3">
             Todos parten de "Presente" salvo que marques lo contrario. Si recepción ya capturó un
             retardo esta mañana, aparecerá reflejado automáticamente aquí.
-            {(totalAusentes > 0 || totalRetardos > 0) && (
-              <> · <span className="text-red-600">{totalAusentes} ausentes</span> · <span className="text-amber-600">{totalRetardos} con retardo</span></>
+            {(totalAusentes > 0 || totalRetardos > 0 || totalAnticipadas > 0) && (
+              <> · <span className="text-red-600">{totalAusentes} ausentes</span> · <span className="text-amber-600">{totalRetardos} con retardo</span> · <span className="text-purple-600">{totalAnticipadas} con salida anticipada</span></>
             )}
           </p>
           <div className="overflow-auto">
@@ -160,6 +200,7 @@ export default function TomarAsistencia() {
                   <th className="p-2 text-left">Nombre</th>
                   <th className="p-2 text-left">Estado</th>
                   <th className="p-2 text-left">Hora de llegada</th>
+                  <th className="p-2 text-left">Salida anticipada</th>
                   <th className="p-2 text-left">Marcar</th>
                 </tr>
               </thead>
@@ -177,6 +218,22 @@ export default function TomarAsistencia() {
                         </span>
                       </td>
                       <td className="p-2 text-gray-500">{registro?.horaLlegada || '—'}</td>
+                      <td className="p-2">
+                        {anticipadasHoy[a.id] ? (
+                          <div title={`Motivo: ${anticipadasHoy[a.id].motivo || '—'}`}>
+                            <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                              Sí · {String(anticipadasHoy[a.id].hora || '').slice(0, 5)}
+                            </span>
+                            {anticipadasHoy[a.id].personaRecoge && (
+                              <p className="text-[10px] text-gray-500 mt-1">
+                                Recoge: {anticipadasHoy[a.id].personaRecoge}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="p-2">
                         <div className="flex flex-wrap items-center gap-1">
                           <button
@@ -210,8 +267,8 @@ export default function TomarAsistencia() {
                 })}
                 {alumnos.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-4 text-center text-gray-400">
-                      No hay alumnos registrados con este tutor.
+                    <td colSpan={6} className="p-4 text-center text-gray-400">
+                      No hay alumnos registrados en esta selección.
                     </td>
                   </tr>
                 )}
